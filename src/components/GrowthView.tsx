@@ -54,9 +54,10 @@ export function GrowthView({ company }: Props) {
         const c = commonSizePl(p)
         return {
           label: p.label,
-          costOfSales: c.costOfSales ?? 0,
-          sga: c.sga ?? 0,
-          operatingProfit: c.operatingProfit ?? 0,
+          // 売上高が 0 以下で計算できない期は、0% にせず、null(棒を描かない)にする
+          costOfSales: c.costOfSales,
+          sga: c.sga,
+          operatingProfit: c.operatingProfit,
         }
       }),
     [periods],
@@ -129,7 +130,7 @@ export function GrowthView({ company }: Props) {
       <div className="mt-12 grid grid-cols-1 gap-x-6 lg:grid-cols-2 [&>section]:mt-12 lg:[&>section]:mt-0">
         <Section title="売上高の推移" lead="年ごとの売上高です。">
           <Panel>
-            <SalesTrendChart trend={trend} axisWidth={amountAxisWidth} />
+            <SalesTrendChart trend={trend} axisWidth={amountAxisWidth} unit={company.unit} />
           </Panel>
         </Section>
 
@@ -138,7 +139,7 @@ export function GrowthView({ company }: Props) {
           lead="営業・経常・当期純利益です。売上が伸びているのに線が寝ている期は、儲けにくくなっているサインです。"
         >
           <Panel>
-            <ProfitTrendChart trend={trend} axisWidth={amountAxisWidth} />
+            <ProfitTrendChart trend={trend} axisWidth={amountAxisWidth} unit={company.unit} />
           </Panel>
         </Section>
       </div>
@@ -148,7 +149,7 @@ export function GrowthView({ company }: Props) {
         lead="売上高から当期純利益まで、どこでどれだけ減って最終的な利益が残ったかを 1 段ずつ追います。"
       >
         <Panel>
-          <WaterfallChart rows={staircase} />
+          <WaterfallChart rows={staircase} unit={company.unit} />
         </Panel>
       </Section>
 
@@ -160,7 +161,7 @@ export function GrowthView({ company }: Props) {
           {bridge === null ? (
             <p>最初の期には前期がないため、増減要因は表示できません。2 期目以降を選んでください。</p>
           ) : (
-            <WaterfallChart rows={bridge} />
+            <WaterfallChart rows={bridge} unit={company.unit} />
           )}
         </Panel>
       </Section>

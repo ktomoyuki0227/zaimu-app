@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -103,5 +103,49 @@ describe('createFileCache: 読み込むファイルの検査', () => {
     await writeFile(join(dir, 'days'), 'file, not a directory')
     await expect(cache.putDay('2025-06-27', [DOC])).rejects.toThrow()
     expect((await readdir(dir)).filter((n) => n.endsWith('.tmp'))).toEqual([])
+  })
+})
+
+describe('createFileCache: 書類(zip)の保存量の上限と掃除', () => {
+  const zip = (n: number): Uint8Array => {
+    const bytes = new Uint8Array(n)
+    bytes[0] = 0x50
+    bytes[1] = 0x4b
+    return bytes
+  }
+
+  test('合計が上限を超えたら、古いもの(書き込みが古い順)から消す。いま保存したものは残る', async () => {
+    const small = createFileCache(dir, { maxTotalZipBytes: 250 })
+    const zipsDir = join(dir, 'zips')
+    await small.putZip('S100AAAA', zip(100))
+    await small.putZip('S100BBBB', zip(100))
+    // 書き込みの古さは、ファイルの時刻で、はっきり決める(時計の細かさに頼らない)
+    await utimes(join(zipsDir, 'S100AAAA.zip'), new Date('2020-01-01'), new Date('2020-01-01'))
+    await utimes(join(zipsDir, 'S100BBBB.zip'), new Date('2021-01-01'), new Date('2021-01-01'))
+    await small.putZip('S100CCCC', zip(100))
+    expect(await small.getZip('S100AAAA')).toBeNull()
+    expect(await small.getZip('S100BBBB')).not.toBeNull()
+    expect(await small.getZip('S100CCCC')).not.toBeNull()
+  })
+
+  test('1 つが上限より大きくても、いま保存したものは消さない(取得を無駄にしない)', async () => {
+    const tiny = createFileCache(dir, { maxTotalZipBytes: 10 })
+    await tiny.putZip('S100AAAA', zip(100))
+    expect(await tiny.getZip('S100AAAA')).not.toBeNull()
+  })
+
+  test('途中で途切れた古い一時ファイル(.tmp)は、保存のついでに消す。新しいものは消さない', async () => {
+    const zipsDir = join(dir, 'zips')
+    await mkdir(zipsDir, { recursive: true })
+    const oldTemp = join(zipsDir, 'S100OLD0.zip.aaaa.tmp')
+    const newTemp = join(zipsDir, 'S100NEW0.zip.bbbb.tmp')
+    await writeFile(oldTemp, 'x')
+    await writeFile(newTemp, 'x')
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000)
+    await utimes(oldTemp, twoHoursAgo, twoHoursAgo)
+    await createFileCache(dir).putZip('S100AAAA', zip(10))
+    const names = await readdir(zipsDir)
+    expect(names).not.toContain('S100OLD0.zip.aaaa.tmp')
+    expect(names).toContain('S100NEW0.zip.bbbb.tmp')
   })
 })

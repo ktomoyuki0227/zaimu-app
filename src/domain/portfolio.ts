@@ -114,6 +114,18 @@ export function upsertCompany(companies: readonly Company[], incoming: Company):
   return [...companies, incoming]
 }
 
+/**
+ * 複数の企業を、順に足す(古い期の書類から順に渡す)。1 つでも足せなければ、全体を null にする
+ * (一部だけ足すと、どこまで入ったかが分からなくなる)。
+ */
+export function upsertAll(companies: readonly Company[], incoming: readonly Company[]): readonly Company[] | null {
+  let next: readonly Company[] | null = companies
+  for (const company of incoming) {
+    next = next === null ? null : upsertCompany(next, company)
+  }
+  return next
+}
+
 export function removeCompany(companies: readonly Company[], id: string): readonly Company[] {
   return companies.filter((c) => c.id !== id)
 }

@@ -176,7 +176,7 @@ export function buildCsvText(rows: readonly FixtureRow[]): string {
 }
 
 /** 文字列を BOM 付きの UTF-16LE にする(EDINET の CSV の文字コード) */
-export function encodeUtf16le(text: string): Uint8Array {
+export function encodeUtf16le(text: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(2 + text.length * 2)
   bytes[0] = 0xff
   bytes[1] = 0xfe

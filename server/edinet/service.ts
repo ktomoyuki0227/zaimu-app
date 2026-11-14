@@ -136,11 +136,50 @@ export async function findAnnualReports(
   return { reports, notFound, pending }
 }
 
-/** 書類(CSV の zip)を取得する。取得済みなら、キャッシュから返す */
-export async function getDocumentZip(deps: ServiceDeps, docID: string, signal?: AbortSignal): Promise<Uint8Array> {
+/** promise を待つ。signal が中止されたら、promise の結果を待たずに、すぐ中止の例外にする */
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return promise
+  signal.throwIfAborted()
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(signal.reason)
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
+  })
+}
+
+/** 実行中のダウンロード(同じ書類を同時に要求されても、1 回だけ取りに行く)。設定(deps)ごとに持つ */
+const inFlight = new WeakMap<object, Map<string, Promise<Uint8Array>>>()
+
+async function downloadAndCache(deps: ServiceDeps, docID: string, signal?: AbortSignal): Promise<Uint8Array> {
   const cached = await deps.cache.getZip(docID).catch(() => null)
   if (cached !== null) return cached
   const bytes = await deps.client.downloadCsvZip(docID, signal)
   await deps.cache.putZip(docID, bytes).catch(() => undefined)
   return bytes
+}
+
+/**
+ * 書類(CSV の zip)を取得する。取得済みなら、キャッシュから返す。
+ * 同じ書類が実行中なら、その結果を待つ。先に始めた側が中止されて失敗したときは、自分の要求が中止されていなければ、取り直す。
+ */
+export async function getDocumentZip(deps: ServiceDeps, docID: string, signal?: AbortSignal): Promise<Uint8Array> {
+  let running = inFlight.get(deps)
+  if (running === undefined) {
+    running = new Map()
+    inFlight.set(deps, running)
+  }
+  const existing = running.get(docID)
+  if (existing !== undefined) {
+    try {
+      // 待っている間に、自分の要求が中止(画面が切断)されたら、先頭のダウンロードの終わりを待たない
+      return await raceAbort(existing, signal)
+    } catch (error) {
+      signal?.throwIfAborted()
+      if (!(error instanceof Error && error.name === 'AbortError')) throw error
+      return getDocumentZip(deps, docID, signal)
+    }
+  }
+  const task = downloadAndCache(deps, docID, signal).finally(() => running.delete(docID))
+  running.set(docID, task)
+  return task
 }

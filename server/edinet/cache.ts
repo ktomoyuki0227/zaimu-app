@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isListedDocument, type ListedDocument } from './documents.ts'
 import { DATE, DOC_ID } from './patterns.ts'
@@ -23,6 +23,11 @@ const FORMAT_VERSION = 1
 const MAX_DAY_BYTES = 20 * 1024 * 1024
 /** 書類(zip)の、読み込む大きさの上限(取得時の上限と同じ) */
 const MAX_ZIP_BYTES = 30 * 1024 * 1024
+
+/** 保存しておく書類(zip)の合計の大きさの上限。超えたら、古いものから消す(取り直せばよいだけ) */
+const DEFAULT_MAX_TOTAL_ZIP_BYTES = 300 * 1024 * 1024
+/** 書き込み途中で途切れた一時ファイルを、消してよいとみなすまでの時間 */
+const STALE_TEMP_MS = 60 * 60_000
 
 const RENAME_RETRIES = 5
 const RENAME_RETRY_DELAY_MS = 20
@@ -65,9 +70,51 @@ async function readSmallFile(path: string, maxBytes: number): Promise<Buffer | n
   }
 }
 
-export function createFileCache(dir: string): EdinetCache {
+/** 途中で途切れた一時ファイル(.tmp)のうち、古いものを消す。失敗しても無視する */
+async function removeStaleTemps(directory: string, now: number): Promise<void> {
+  const names = await readdir(directory).catch(() => [] as string[])
+  await Promise.all(
+    names
+      .filter((name) => name.endsWith('.tmp'))
+      .map(async (name) => {
+        const path = join(directory, name)
+        const info = await stat(path).catch(() => null)
+        if (info !== null && now - info.mtimeMs > STALE_TEMP_MS) await unlink(path).catch(() => undefined)
+      }),
+  )
+}
+
+/** zip の合計が上限を超えていたら、古いもの(書き込みが古い順)から消す。いま書いた zip は残す */
+async function evictOldZips(directory: string, keep: string, maxTotalBytes: number): Promise<void> {
+  const names = (await readdir(directory).catch(() => [] as string[])).filter((n) => n.endsWith('.zip'))
+  const files = (
+    await Promise.all(
+      names.map(async (name) => {
+        const info = await stat(join(directory, name)).catch(() => null)
+        return info === null || !info.isFile() ? [] : [{ name, size: info.size, mtime: info.mtimeMs }]
+      }),
+    )
+  ).flat()
+  let total = files.reduce((sum, f) => sum + f.size, 0)
+  for (const file of files.sort((a, b) => a.mtime - b.mtime)) {
+    if (total <= maxTotalBytes) break
+    if (file.name === keep) continue
+    await unlink(join(directory, file.name)).catch(() => undefined)
+    total -= file.size
+  }
+}
+
+export interface FileCacheOptions {
+  /** 保存しておく書類(zip)の合計の大きさの上限(バイト) */
+  readonly maxTotalZipBytes?: number
+  readonly now?: () => number
+}
+
+export function createFileCache(dir: string, options: FileCacheOptions = {}): EdinetCache {
+  const { maxTotalZipBytes = DEFAULT_MAX_TOTAL_ZIP_BYTES, now = Date.now } = options
   const daysDir = join(dir, 'days')
   const zipsDir = join(dir, 'zips')
+  let tempsCleaned = false
 
   return {
     async getDay(date) {
@@ -103,6 +150,13 @@ export function createFileCache(dir: string): EdinetCache {
       if (!DOC_ID.test(docID)) throw new Error('書類管理番号の形式が正しくありません。')
       await mkdir(zipsDir, { recursive: true })
       await atomicWrite(join(zipsDir, `${docID}.zip`), bytes)
+      // 掃除の失敗で、取得そのものは失敗させない
+      if (!tempsCleaned) {
+        tempsCleaned = true
+        await removeStaleTemps(zipsDir, now())
+        await removeStaleTemps(daysDir, now())
+      }
+      await evictOldZips(zipsDir, `${docID}.zip`, maxTotalZipBytes)
     },
   }
 }

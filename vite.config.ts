@@ -2,47 +2,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { loadEnv, type Plugin } from 'vite'
+import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { edinetLocalApi } from './server/edinet/vitePlugin.ts'
+import { contentSecurityPolicy } from './server/securityHeaders.ts'
 
 /** このファイルのあるフォルダ(プロジェクトの根)。どのフォルダから起動しても、.env とキャッシュの場所が変わらないようにする */
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url))
-
-/**
- * 本番ビルドに入れる Content-Security-Policy。
- * 外部への通信を一切許さず、スクリプト・スタイル・フォントを同じオリジンのファイルだけに限る。
- * - style-src-attr 'unsafe-inline': グラフ(Recharts)や React が style 属性を使うため、属性だけ許可する
- *   (スタイルシートや <style> タグのインライン指定は許可しない)
- * - frame-ancestors は meta では効かないため、ホスティング側の HTTP ヘッダで設定する
- */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "style-src-attr 'unsafe-inline'",
-  "font-src 'self'",
-  "img-src 'self'",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ')
-
-/** 開発サーバー(HMR がインラインのスクリプトを使う)には入れず、ビルドにだけ meta を差し込む */
-function contentSecurityPolicy(): Plugin {
-  return {
-    name: 'inject-content-security-policy',
-    apply: 'build',
-    transformIndexHtml: () => [
-      {
-        tag: 'meta',
-        attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
-        injectTo: 'head-prepend',
-      },
-    ],
-  }
-}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -78,15 +44,19 @@ export default defineConfig(({ mode }) => ({
   preview: { cors: false },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'server/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/domain/**/*.ts', 'server/edinet/**/*.ts'],
+      // 下回ったら、カバレッジの確認(npm run test:coverage)が失敗する。実測は、文 93%・分岐 85%(2026-11)
+      thresholds: { statements: 85, lines: 85, functions: 85, branches: 75 },
+      include: ['src/domain/**/*.ts', 'src/lib/**/*.ts', 'src/components/**/*.{ts,tsx}', 'src/App.tsx', 'server/edinet/**/*.ts'],
       exclude: [
-        'src/domain/**/*.test.ts',
+        '**/*.test.{ts,tsx}',
         'src/domain/fixtures.ts',
+        'src/domain/**/testing/**',
         'src/domain/types.ts',
-        'server/edinet/**/*.test.ts',
+        'src/domain/import/types.ts',
+        'src/data/**',
         // Vite への組み込み(薄い接続部分)は、起動して確かめる
         'server/edinet/vitePlugin.ts',
       ],

@@ -30,16 +30,26 @@ export interface TrendPoint {
   readonly netIncome: number
 }
 
+/** 売上高を 100% としたときの割合(%)。売上高が 0 以下の期は、計算できないので null */
 export interface CompositionPoint {
   readonly label: string
-  readonly costOfSales: number
-  readonly sga: number
-  readonly operatingProfit: number
+  readonly costOfSales: number | null
+  readonly sga: number | null
+  readonly operatingProfit: number | null
 }
 
 type LineSeriesKey = 'sales' | 'operatingProfit' | 'ordinaryProfit' | 'netIncome'
 
 const amountTooltip = (v: unknown): string => (typeof v === 'number' ? formatAmount(v) : String(v))
+
+/** グラフの中身を、グラフが見えない人にも伝える文(画面には出さない。読み上げ用) */
+function ChartSummary({ children }: { readonly children: string }) {
+  return <p className="sr-only">{children}</p>
+}
+
+function unitSuffix(unit: string | undefined): string {
+  return unit === undefined ? '' : `(単位: ${unit})`
+}
 
 /** 折れ線の定義(色と線の種類は、系列ごとに決まっている)。dots: 点を付けるか */
 function seriesLines(keys: readonly LineSeriesKey[], dots: boolean) {
@@ -57,39 +67,60 @@ function seriesLines(keys: readonly LineSeriesKey[], dots: boolean) {
   ))
 }
 
+interface TrendProps {
+  readonly trend: readonly TrendPoint[]
+  readonly axisWidth: number
+  /** 金額の単位(読み上げの文に添える) */
+  readonly unit?: string
+}
+
 /** 売上高の棒グラフ */
-export function SalesTrendChart({ trend, axisWidth }: { readonly trend: readonly TrendPoint[]; readonly axisWidth: number }) {
+export function SalesTrendChart({ trend, axisWidth, unit }: TrendProps) {
   return (
-    <ResponsiveContainer width="100%" height={HEIGHT_TREND}>
-      <BarChart data={[...trend]} margin={{ ...MARGIN, right: 8 }}>
-        <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-        <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-        <YAxis tick={AXIS_TICK} width={axisWidth} tickFormatter={(v: number) => formatAmount(v)} />
-        <Tooltip formatter={amountTooltip} />
-        <Bar dataKey="sales" name={SERIES.sales.label} fill={SERIES.sales.color} isAnimationActive={false} />
-      </BarChart>
-    </ResponsiveContainer>
+    <>
+      <ChartSummary>
+        {`売上高の推移${unitSuffix(unit)}: ${trend.map((t) => `${t.label} ${formatAmount(t.sales)}`).join('、')}`}
+      </ChartSummary>
+      <ResponsiveContainer width="100%" height={HEIGHT_TREND}>
+        <BarChart data={[...trend]} margin={{ ...MARGIN, right: 8 }}>
+          <CartesianGrid stroke={GRID_STROKE} vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
+          <YAxis tick={AXIS_TICK} width={axisWidth} tickFormatter={(v: number) => formatAmount(v)} />
+          <Tooltip formatter={amountTooltip} />
+          <Bar dataKey="sales" name={SERIES.sales.label} fill={SERIES.sales.color} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </>
   )
 }
 
 /** 営業・経常・当期純利益の折れ線 */
-export function ProfitTrendChart({ trend, axisWidth }: { readonly trend: readonly TrendPoint[]; readonly axisWidth: number }) {
+export function ProfitTrendChart({ trend, axisWidth, unit }: TrendProps) {
+  const text = trend
+    .map(
+      (t) =>
+        `${t.label} 営業利益 ${formatAmount(t.operatingProfit)}、経常利益 ${formatAmount(t.ordinaryProfit)}、当期純利益 ${formatAmount(t.netIncome)}`,
+    )
+    .join('。')
   return (
-    <ResponsiveContainer width="100%" height={HEIGHT_TREND}>
-      <LineChart data={[...trend]} margin={MARGIN}>
-        <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-        <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-        <YAxis tick={AXIS_TICK} width={axisWidth} tickFormatter={(v: number) => formatAmount(v)} />
-        <Tooltip formatter={amountTooltip} />
-        <Legend />
-        <ReferenceLine y={0} stroke={ZERO_LINE_STROKE} />
-        {seriesLines(['operatingProfit', 'ordinaryProfit', 'netIncome'], true)}
-      </LineChart>
-    </ResponsiveContainer>
+    <>
+      <ChartSummary>{`各段階の利益の推移${unitSuffix(unit)}: ${text}`}</ChartSummary>
+      <ResponsiveContainer width="100%" height={HEIGHT_TREND}>
+        <LineChart data={[...trend]} margin={MARGIN}>
+          <CartesianGrid stroke={GRID_STROKE} vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
+          <YAxis tick={AXIS_TICK} width={axisWidth} tickFormatter={(v: number) => formatAmount(v)} />
+          <Tooltip formatter={amountTooltip} />
+          <Legend />
+          <ReferenceLine y={0} stroke={ZERO_LINE_STROKE} />
+          {seriesLines(['operatingProfit', 'ordinaryProfit', 'netIncome'], true)}
+        </LineChart>
+      </ResponsiveContainer>
+    </>
   )
 }
 
-/** 前期比の増減率の折れ線。下に、同じ数値の表(折りたたみ)を付ける */
+/** 前期比の増減率の折れ線。下に、同じ数値の表(折りたたみ。読み上げにも使える)を付ける */
 export function GrowthRateChart({ growth }: { readonly growth: readonly GrowthPoint[] }) {
   return (
     <>
@@ -151,27 +182,47 @@ export function GrowthRateChart({ growth }: { readonly growth: readonly GrowthPo
   )
 }
 
-/** 売上高を 100% としたときの、原価・販管費・営業利益の積み上げ棒グラフ */
+const percentText = (v: number | null): string => (v === null ? '計算できません' : `${v.toFixed(1)}%`)
+
+/**
+ * 売上高を 100% としたときの、原価・販管費・営業利益の積み上げ棒グラフ。
+ * 売上高が 0 以下の期は割合を計算できないので、0% の棒にせず、棒を描かずに、その旨を書く。
+ */
 export function CompositionChart({ composition }: { readonly composition: readonly CompositionPoint[] }) {
+  const skipped = composition.filter((c) => c.costOfSales === null).map((c) => c.label)
+  const text = composition
+    .map(
+      (c) =>
+        `${c.label} 売上原価 ${percentText(c.costOfSales)}、販管費 ${percentText(c.sga)}、営業利益 ${percentText(c.operatingProfit)}`,
+    )
+    .join('。')
   return (
-    <ResponsiveContainer width="100%" height={HEIGHT_RATE}>
-      <BarChart data={[...composition]} margin={MARGIN}>
-        <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-        <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-        <YAxis tick={AXIS_TICK} width={PERCENT_AXIS_WIDTH} tickFormatter={(v: number) => `${v}%`} />
-        <Tooltip formatter={(v) => (typeof v === 'number' ? `${v.toFixed(1)}%` : String(v))} />
-        <Legend />
-        <ReferenceLine y={100} stroke={ZERO_LINE_STROKE} strokeDasharray="6 4" />
-        <Bar dataKey="costOfSales" name="売上原価" stackId="pl" fill="var(--color-solid-gray-300)" isAnimationActive={false} />
-        <Bar dataKey="sga" name="販管費" stackId="pl" fill="var(--color-solid-gray-500)" isAnimationActive={false} />
-        <Bar
-          dataKey="operatingProfit"
-          name="営業利益"
-          stackId="pl"
-          fill={SERIES.operatingProfit.color}
-          isAnimationActive={false}
-        />
-      </BarChart>
-    </ResponsiveContainer>
+    <>
+      <ChartSummary>{`売上高を 100% としたときの中身: ${text}`}</ChartSummary>
+      <ResponsiveContainer width="100%" height={HEIGHT_RATE}>
+        <BarChart data={[...composition]} margin={MARGIN}>
+          <CartesianGrid stroke={GRID_STROKE} vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
+          <YAxis tick={AXIS_TICK} width={PERCENT_AXIS_WIDTH} tickFormatter={(v: number) => `${v}%`} />
+          <Tooltip formatter={(v) => (typeof v === 'number' ? `${v.toFixed(1)}%` : String(v))} />
+          <Legend />
+          <ReferenceLine y={100} stroke={ZERO_LINE_STROKE} strokeDasharray="6 4" />
+          <Bar dataKey="costOfSales" name="売上原価" stackId="pl" fill="var(--color-solid-gray-300)" isAnimationActive={false} />
+          <Bar dataKey="sga" name="販管費" stackId="pl" fill="var(--color-solid-gray-500)" isAnimationActive={false} />
+          <Bar
+            dataKey="operatingProfit"
+            name="営業利益"
+            stackId="pl"
+            fill={SERIES.operatingProfit.color}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+      {skipped.length > 0 ? (
+        <p className="mt-2 text-sm text-solid-gray-700">
+          売上高が 0 以下の期({skipped.join('、')})は、割合を計算できないため、棒を描いていません。
+        </p>
+      ) : null}
+    </>
   )
 }

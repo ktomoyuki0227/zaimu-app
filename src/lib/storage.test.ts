@@ -22,6 +22,7 @@ const company: Company = { id: 'edinet-E12345', name: 'テスト社', unit: '百
 const PORTFOLIO_KEY = 'zaimu-view:portfolio:v2'
 const LEGACY_KEY = 'zaimu-view:company:v1'
 const BACKUP_KEY = 'zaimu-view:portfolio:backup'
+const PREVIOUS_BACKUP_KEY = 'zaimu-view:portfolio:backup:previous'
 
 let storage: FakeStorage
 
@@ -50,6 +51,23 @@ describe('loadCompanies / saveCompanies', () => {
     storage.data.set(PORTFOLIO_KEY, '{"version":2,"companies":[{"id":"x"}]}')
     expect(loadCompanies()).toEqual({ status: 'corrupted' })
     expect(storage.data.get(BACKUP_KEY)).toBe('{"version":2,"companies":[{"id":"x"}]}')
+  })
+
+  test('壊れた状態が続けて起きても、最初の退避は残る(退避は 2 つまで)', () => {
+    storage.data.set(PORTFOLIO_KEY, '{first')
+    loadCompanies()
+    storage.data.set(PORTFOLIO_KEY, '{second')
+    loadCompanies()
+    expect(storage.data.get(BACKUP_KEY)).toBe('{second')
+    expect(storage.data.get(PREVIOUS_BACKUP_KEY)).toBe('{first')
+  })
+
+  test('同じ内容の退避を、繰り返しても、1 つ前の退避を消さない', () => {
+    storage.data.set(PORTFOLIO_KEY, '{same')
+    loadCompanies()
+    loadCompanies()
+    expect(storage.data.get(BACKUP_KEY)).toBe('{same')
+    expect(storage.data.has(PREVIOUS_BACKUP_KEY)).toBe(false)
   })
 
   test('JSON として読めない保存データも corrupted(例外にしない)', () => {

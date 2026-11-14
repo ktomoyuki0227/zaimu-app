@@ -3,10 +3,8 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { gapToGuideline } from '../domain/benchmark'
 import {
   METRIC_CATALOG,
-  displayDigits,
   evaluateMetric,
   guidelineText,
-  roundForDisplay,
   unavailableText,
   type MetricDefinition,
   type MetricGroup,
@@ -14,7 +12,7 @@ import {
 } from '../domain/catalog'
 import { calcMetrics, type UnavailableReason } from '../domain/metrics'
 import type { Company } from '../domain/types'
-import { formatMetric } from '../lib/format'
+import { formatChange, formatMetric } from '../lib/format'
 import { gapText } from '../lib/gap'
 import { Bullet } from './Bullet'
 import { levelLabel, levelMark } from './levelStyle'
@@ -42,22 +40,6 @@ const SUBGROUPS: Record<MetricGroup, readonly { readonly title: string; readonly
     { title: '資金の調達バランス', keys: ['equityRatio', 'fixedRatio', 'fixedLongTermRatio', 'debtToEquity'] },
     { title: '借入の重さ', keys: ['interestBearingDebtMultiple', 'debtRepaymentYears', 'interestCoverage'] },
   ],
-}
-
-function changeText(def: MetricDefinition, now: number | null, before: number | null): string {
-  if (now === null || before === null) {
-    return '前期との比較はできません'
-  }
-  const digits = displayDigits(def.unit)
-  // 表示する桁で 0 になる差は「横ばい」とする(「↑ +0.0pt」と出さない)
-  const diff = roundForDisplay(now, def.unit) - roundForDisplay(before, def.unit)
-  if (Math.abs(diff) < 0.5 * 10 ** -digits) {
-    return '前期から横ばい'
-  }
-  const arrow = diff > 0 ? '↑' : '↓'
-  const unit = def.unit === '%' ? 'pt' : def.unit
-  const sign = diff > 0 ? '+' : ''
-  return `前期から ${arrow} ${sign}${diff.toFixed(digits)}${unit}`
 }
 
 /** 目安が無い指標の推移を、小さな折れ線で見せる */
@@ -105,7 +87,7 @@ function MetricCard({ def, labels, series, reasons }: CardProps) {
         {formatMetric(now, def.unit)}
       </p>
       <p className={now === null && nowReason ? 'font-bold text-solid-gray-900' : 'text-solid-gray-700'}>
-        {now === null && nowReason ? unavailableText(nowReason) : changeText(def, now, before)}
+        {now === null && nowReason ? unavailableText(nowReason) : formatChange(def.unit, now, before)}
       </p>
 
       {guide ? (

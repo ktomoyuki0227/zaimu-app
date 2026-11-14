@@ -1,6 +1,13 @@
-import { displayDigits, type MetricUnit } from '../domain/catalog'
+import { displayDigits, roundForDisplay, type MetricUnit } from '../domain/catalog'
 
 const MISSING = '—'
+
+const UNNAMED = '(名前なし)'
+
+/** 画面に出す企業の名前。名前が空のときは「(名前なし)」 */
+export function companyLabel(company: { readonly name: string }): string {
+  return company.name || UNNAMED
+}
 
 /** 金額(整数でなくても桁区切りで表示) */
 export function formatAmount(value: number): string {
@@ -41,4 +48,24 @@ const PERIOD_LABEL = /^(\d{4})年(\d{1,2})月期$/
 export function shortPeriodLabel(label: string): string {
   const m = PERIOD_LABEL.exec(label)
   return m === null ? label : `${m[1]}/${Number(m[2])}`
+}
+
+const NO_COMPARISON = '前期との比較はできません'
+
+/**
+ * 前期からの変化の文。表示する桁に丸めた値どうしの差で決めるので、表示と食い違わない
+ * (「12.3%」と「12.3%」なのに、「↑ +0.1pt」と出さない)。率(%)の差は「pt」、ほかは単位のまま。
+ */
+export function formatChange(unit: MetricUnit, now: number | null, before: number | null): string {
+  if (now === null || before === null) {
+    return NO_COMPARISON
+  }
+  const digits = displayDigits(unit)
+  const diff = roundForDisplay(now, unit) - roundForDisplay(before, unit)
+  // 表示する桁で 0 になる差は「横ばい」とする(「↑ +0.0pt」と出さない)
+  if (Math.abs(diff) < 0.5 * 10 ** -digits) {
+    return '前期から横ばい'
+  }
+  const suffix = unit === '%' ? 'pt' : unit
+  return `前期から ${diff > 0 ? '↑ +' : '↓ '}${diff.toFixed(digits)}${suffix}`
 }

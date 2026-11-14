@@ -36,10 +36,13 @@ npm run dev
 ### そのほかのコマンド
 
 ```bash
-npm test          # テスト(vitest)
-npm run lint      # oxlint
-npm run build     # 本番用ビルド
+npm test               # テスト(vitest)
+npm run test:coverage  # カバレッジつきのテスト(基準を下回ると失敗)
+npm run lint           # oxlint
+npm run build          # 本番用ビルド(dist/ に、公開用の _headers も出す)
 ```
+
+公開するときは、[docs/hosting-headers.md](docs/hosting-headers.md) を見てください。
 
 ## 作り
 
@@ -48,6 +51,7 @@ npm run build     # 本番用ビルド
   - `import/`: EDINET の CSV → 22 項目(日本基準・IFRS)
   - `metrics.ts` ほか: 指標の計算と判定
 - 取り込み(`src/lib/import`): zip の展開(展開後の大きさに上限あり)と文字コードの判別
+- 画面(`src/components`): 状態は、フック(`useCompanies`・`useImport`・`useEdinetFetch`)に分け、画面の部品は表示に専念する。フックと主要な画面は、jsdom + Testing Library でテストしている
 - 中継(`server/edinet`): EDINET API を呼ぶ小さな中継。開発サーバーの中だけで動く
 
 ## 安全面の考え方

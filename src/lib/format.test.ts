@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel } from './format'
+import { formatChange, formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel } from './format'
 
 describe('formatMetric', () => {
   test('単位ごとの桁数で表示する', () => {
@@ -50,5 +50,30 @@ describe('shortPeriodLabel', () => {
   test('読めない名前は、そのまま返す', () => {
     expect(shortPeriodLabel('新しい期')).toBe('新しい期')
     expect(shortPeriodLabel('FY2025')).toBe('FY2025')
+  })
+})
+
+describe('formatChange', () => {
+  test('率(%)の差は pt で、上がれば ↑ +、下がれば ↓', () => {
+    expect(formatChange('%', 15.6, 14.2)).toBe('前期から ↑ +1.4pt')
+    expect(formatChange('%', 14.2, 15.6)).toBe('前期から ↓ -1.4pt')
+  })
+
+  test('表示する桁で同じ値になるときは、微小な差でも「横ばい」(「↑ +0.0pt」と出さない)', () => {
+    expect(formatChange('%', 12.34, 12.26)).toBe('前期から横ばい')
+    expect(formatChange('%', 12.0, 12.0)).toBe('前期から横ばい')
+  })
+
+  test('表示と食い違わない: 12.04 → 12.06 は、どちらも 12.0 / 12.1 と表示されるので差は 0.1', () => {
+    expect(formatChange('%', 12.06, 12.04)).toBe('前期から ↑ +0.1pt')
+  })
+
+  test('倍・年など、% 以外の単位は、その単位のまま', () => {
+    expect(formatChange('倍', 2.5, 2.0)).toBe('前期から ↑ +0.50倍')
+  })
+
+  test('どちらかが算出できないときは、比較できない', () => {
+    expect(formatChange('%', null, 10)).toBe('前期との比較はできません')
+    expect(formatChange('%', 10, null)).toBe('前期との比較はできません')
   })
 })

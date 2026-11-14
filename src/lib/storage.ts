@@ -2,9 +2,19 @@ import type { Company } from '../domain/types'
 import { PORTFOLIO_VERSION, parseCompany, parsePortfolio } from '../domain/validate'
 
 const PORTFOLIO_KEY = 'zaimu-view:portfolio:v2'
+
+/** 他のタブが企業の一覧を書き換えたときの、storage イベントか */
+export function isPortfolioChange(event: StorageEvent): boolean {
+  // sessionStorage の同じ名前の項目には反応しない(localStorage の変更だけを見る)
+  if (event.storageArea !== null && event.storageArea !== window.localStorage) return false
+  // key が null なのは、保存領域ごと消されたとき(clear)
+  return event.key === PORTFOLIO_KEY || event.key === null
+}
 /** 1 社分だけを保存していた旧い形式。あれば、読み込んで企業の一覧に引き継ぐ */
 const LEGACY_COMPANY_KEY = 'zaimu-view:company:v1'
 const BACKUP_KEY = 'zaimu-view:portfolio:backup'
+/** 1 つ前の退避。壊れた状態が続けて起きても、最初の退避を残すため */
+const PREVIOUS_BACKUP_KEY = 'zaimu-view:portfolio:backup:previous'
 /** 旧い形式で、練習用データを自動で保存していたときの id。引き継がない(練習用データは、いつでも読み込み直せる) */
 const LEGACY_SAMPLE_ID = 'sample'
 
@@ -21,9 +31,14 @@ export type LoadResult =
   | { readonly status: 'corrupted' }
   | { readonly status: 'unavailable' }
 
-/** 壊れたデータは、次の自動保存で上書きされる前に退避しておく(失敗しても画面は止めない) */
+/**
+ * 壊れたデータは、次の自動保存で上書きされる前に退避しておく(失敗しても画面は止めない)。
+ * 退避は 2 つまで残す(新しい退避が、1 つ前の退避を消してしまわないように、ずらして置く)。
+ */
 function backUp(raw: string): void {
   try {
+    const previous = window.localStorage.getItem(BACKUP_KEY)
+    if (previous !== null && previous !== raw) window.localStorage.setItem(PREVIOUS_BACKUP_KEY, previous)
     window.localStorage.setItem(BACKUP_KEY, raw)
   } catch {
     // 退避できなくても、読み込み結果の通知は続ける

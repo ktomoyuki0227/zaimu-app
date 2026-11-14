@@ -82,19 +82,23 @@ function WrappedTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payloa
 
 interface Props {
   readonly rows: readonly WaterfallRow[]
+  /** 金額の単位(読み上げの文に添える) */
+  readonly unit?: string
   readonly height?: number
 }
 
 /** 滝グラフ。合計は 0 から立ち上がり、増減は直前の累計から浮かせて描く */
-export function WaterfallChart({ rows, height = 340 }: Props) {
+export function WaterfallChart({ rows, height = 340, unit }: Props) {
   const axisWidth = yAxisWidth(
     rows.flatMap((r) => r.range),
     formatAmount,
   )
   // 棒の上に出す文字は、行ごとに先に作っておく(グラフの部品に、行を探させない)
   const data = rows.map((row) => ({ ...row, text: rowLabel(row) }))
+  const summary = rows.map((r) => `${r.label} ${rowLabel(r)}`).join('、')
   return (
     <div>
+      <p className="sr-only">{`${unit === undefined ? '' : `(単位: ${unit})`}${summary}`}</p>
       {/* 項目が多いので、狭い画面では 1 項目あたりの幅を確保して、横にスクロールできるようにする */}
       <div className="relative overflow-x-auto">
         <div style={{ minWidth: rows.length * MIN_BAR_SLOT_PX + axisWidth }}>

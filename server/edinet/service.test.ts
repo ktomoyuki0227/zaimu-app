@@ -268,4 +268,85 @@ describe('getDocumentZip', () => {
     expect(Array.from(a)).toEqual(Array.from(b))
     expect(downloaded).toEqual(['S100AAAA'])
   })
+
+  test('同じ書類を同時に要求されても、EDINET へは 1 回だけ取りに行く', async () => {
+    const { cache } = memoryCache()
+    let calls = 0
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const client = {
+      listDocuments: async () => [],
+      downloadCsvZip: async () => {
+        calls += 1
+        await gate
+        return Uint8Array.of(0x50, 0x4b, 3, 4)
+      },
+    }
+    const deps = { client, cache }
+    const both = Promise.all([getDocumentZip(deps, 'S100AAAA'), getDocumentZip(deps, 'S100AAAA')])
+    release()
+    const [a, b] = await both
+    expect(calls).toBe(1)
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+
+  test('違う書類は、同時でも、それぞれ取りに行く', async () => {
+    const { cache } = memoryCache()
+    const { client, downloaded } = fakeClient({})
+    const deps = { client, cache }
+    await Promise.all([getDocumentZip(deps, 'S100AAAA'), getDocumentZip(deps, 'S100BBBB')])
+    expect([...downloaded].sort()).toEqual(['S100AAAA', 'S100BBBB'])
+  })
+
+  test('先に始めた側が中止されても、待っていた側(中止されていない)は、取り直して書類を受け取る', async () => {
+    const { cache } = memoryCache()
+    const first = new AbortController()
+    let calls = 0
+    const client = {
+      listDocuments: async () => [],
+      downloadCsvZip: async (_id: string, signal?: AbortSignal) => {
+        calls += 1
+        if (calls === 1) {
+          // 1 回目は、中止されるまで待つ
+          await new Promise<void>((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(signal.reason))
+          })
+        }
+        return Uint8Array.of(0x50, 0x4b, 3, 4)
+      },
+    }
+    const deps = { client, cache }
+    const leader = getDocumentZip(deps, 'S100AAAA', first.signal)
+    const follower = getDocumentZip(deps, 'S100AAAA')
+    // 先頭の要求が EDINET への取得を始めてから、中止する
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    first.abort()
+    await expect(leader).rejects.toBeDefined()
+    expect(Array.from(await follower)).toEqual([0x50, 0x4b, 3, 4])
+    expect(calls).toBe(2)
+  })
+
+  test('待っていた側自身が中止されたら、先頭のダウンロードの終わりを待たずに、すぐ中止にする', async () => {
+    const { cache } = memoryCache()
+    let calls = 0
+    const client = {
+      listDocuments: async () => [],
+      // 先頭のダウンロードは、終わらない(中止もされない)
+      downloadCsvZip: () => {
+        calls += 1
+        return new Promise<Uint8Array>(() => undefined)
+      },
+    }
+    const deps = { client, cache }
+    void getDocumentZip(deps, 'S100AAAA').catch(() => undefined)
+    const second = new AbortController()
+    const follower = getDocumentZip(deps, 'S100AAAA', second.signal)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    second.abort()
+    await expect(follower).rejects.toMatchObject({ name: 'AbortError' })
+    // 待っていた側のために、もう 1 回取りに行ったりはしない
+    expect(calls).toBe(1)
+  })
 })

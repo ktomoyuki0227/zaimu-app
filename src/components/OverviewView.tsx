@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import { METRIC_CATALOG, displayDigits, getMetricDefinition, unavailableText, type EvaluationLevel } from '../domain/catalog'
+import { METRIC_CATALOG, getMetricDefinition, unavailableText, type EvaluationLevel } from '../domain/catalog'
 import { growthRate } from '../domain/growth'
 import { growthInsights } from '../domain/insights'
 import { summarize, type AxisSummary, type Concern, type Kpi } from '../domain/overview'
 import type { Company } from '../domain/types'
-import { formatAmount, formatMetric, formatSignedPercent } from '../lib/format'
+import { companyLabel, formatAmount, formatChange, formatMetric, formatSignedPercent } from '../lib/format'
 import { gapText } from '../lib/gap'
 import { AXIS_VERDICT_LABEL, LEVEL_STYLE } from './levelStyle'
 import { LevelBadge, Panel, Section } from './ui'
@@ -53,17 +53,14 @@ function AxisCard({ axis, onOpen }: { readonly axis: AxisSummary; readonly onOpe
 
 /** 前期との差。金額は増減率(%)、率の指標は差(pt) */
 function kpiChange(kpi: Kpi): string {
+  if (kpi.id !== 'sales') {
+    return formatChange('%', kpi.value, kpi.previous)
+  }
   if (kpi.value === null || kpi.previous === null) {
     return '前期との比較はできません'
   }
-  if (kpi.id === 'sales') {
-    const g = growthRate(kpi.previous, kpi.value)
-    return g === null ? '前期との比較はできません' : `前期比 ${formatSignedPercent(g)}`
-  }
-  const digits = displayDigits('%')
-  const diff = Number((kpi.value - kpi.previous).toFixed(digits))
-  if (diff === 0) return '前期から横ばい'
-  return `前期から ${diff > 0 ? '↑ +' : '↓ '}${diff.toFixed(digits)}pt`
+  const g = growthRate(kpi.previous, kpi.value)
+  return g === null ? '前期との比較はできません' : `前期比 ${formatSignedPercent(g)}`
 }
 
 function KpiTile({ kpi }: { readonly kpi: Kpi }) {
@@ -123,7 +120,7 @@ export function OverviewView({ company, onOpen }: Props) {
   return (
     <div>
       <Section
-        title={`${company.name || '(名前なし)'}の概要(${overview.latestLabel})`}
+        title={`${companyLabel(company)}の概要(${overview.latestLabel})`}
         lead={`最新期の財務を、成長性・収益性・安定性の 3 つの軸でひとことにまとめました。判定は、目安のある ${metricCount} 指標を一般的な基準に照らした結果です。`}
       >
         <ul className="grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-3">

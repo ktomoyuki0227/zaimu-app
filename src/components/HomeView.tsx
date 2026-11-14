@@ -3,14 +3,13 @@ import { MAX_COMPANIES } from '../domain/portfolio'
 import { summarize } from '../domain/overview'
 import type { Company } from '../domain/types'
 import type { LocalApiStatus } from '../lib/edinet/localApi'
+import { companyLabel } from '../lib/format'
 import { AXIS_VERDICT_LABEL, LEVEL_STYLE } from './levelStyle'
 import { EdinetFetchPanel } from './EdinetFetchPanel'
 import { ImportStatus } from './ImportStatus'
+import { BUTTON_PRIMARY, LINK } from './styles'
 import type { ImportController } from './useImport'
 
-const BUTTON_PRIMARY =
-  'min-h-11 rounded-8 bg-blue-900 px-5 py-2 font-bold text-white hover:bg-blue-1000 active:bg-blue-1200'
-const LINK = 'font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000'
 
 /** 企業ごとの、3 つの軸の判定(◎△▲)を小さく並べる */
 function VerdictChips({ company }: { readonly company: Company }) {
@@ -46,7 +45,7 @@ function CompanyCard({
   const last = company.periods[company.periods.length - 1]
   return (
     <li className="flex flex-col rounded-8 border border-solid-gray-420 bg-white p-4">
-      <h3 className="text-lg font-bold leading-snug">{company.name || '(名前なし)'}</h3>
+      <h3 className="text-lg font-bold leading-snug">{companyLabel(company)}</h3>
       <p className="tnum mt-1 text-solid-gray-800">
         {first.label === last.label ? first.label : `${first.label} 〜 ${last.label}`}({company.periods.length} 期分
         {company.unit !== undefined ? `、単位: ${company.unit}` : ''})
@@ -61,7 +60,7 @@ function CompanyCard({
         <button
           type="button"
           onClick={onRemove}
-          aria-label={`${company.name || '(名前なし)'}を一覧から削除`}
+          aria-label={`${companyLabel(company)}を一覧から削除`}
           className="min-h-11 min-w-11 px-2 text-blue-900 underline underline-offset-4 hover:text-blue-1000"
         >
           削除
