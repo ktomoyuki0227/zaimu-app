@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
+  CONNECTION_ERROR,
   fetchDocument,
   fetchStatus,
   parseReportEvent,
@@ -243,5 +244,45 @@ describe('中継の応答を、入力として疑う', () => {
         }),
     )
     await expect(fetchDocument('S100AAAA')).rejects.toThrow('大きすぎる')
+  })
+})
+
+describe('開発サーバーに届かないとき', () => {
+  /** サーバーが止まっているときの、ブラウザの fetch の失敗(TypeError: Failed to fetch) */
+  function serverDown(): void {
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('Failed to fetch')
+    })
+  }
+
+  test('企業の検索: 生の「Failed to fetch」ではなく、サーバーの確認を促す文章にする', async () => {
+    serverDown()
+    await expect(searchCompanies('NTT')).rejects.toThrow(CONNECTION_ERROR)
+    await expect(searchCompanies('NTT')).rejects.not.toThrow(/Failed to fetch/)
+  })
+
+  test('書類の探索・書類の取得も、同じ文章にする', async () => {
+    serverDown()
+    await expect(streamReports('E90001', 3, () => undefined)).rejects.toThrow(CONNECTION_ERROR)
+    await expect(fetchDocument('S100AAAA')).rejects.toThrow(CONNECTION_ERROR)
+  })
+
+  test('探索の途中でサーバーが止まったときも、同じ文章にする', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new TypeError('network error'))
+      },
+    })
+    stubFetch(() => new Response(stream, { status: 200 }))
+    await expect(streamReports('E90001', 3, () => undefined)).rejects.toThrow(CONNECTION_ERROR)
+  })
+
+  test('利用者が中止したときは、接続エラーにしない(中止のまま)', async () => {
+    const abort = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      abort.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+    await expect(searchCompanies('NTT', abort.signal)).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

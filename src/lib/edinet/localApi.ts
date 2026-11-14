@@ -7,6 +7,13 @@ import { cleanText } from '../../domain/import/text'
 import { DEFAULT_IMPORT_LIMITS, MAX_TEXT_LENGTH } from '../../domain/limits'
 
 const BASE = '/local-api/edinet'
+
+/**
+ * 開発サーバー(中継)に届かなかったとき(止まっている・再起動中・別のポートの画面を開いている)の文章。
+ * ブラウザの生のエラー(「Failed to fetch」)は、原因が分からないので、そのまま出さない。
+ */
+export const CONNECTION_ERROR =
+  '開発サーバー(npm run dev)に接続できませんでした。サーバーが動いているか確かめて、画面を開き直してください(サーバーを再起動したあとも、開き直しが必要です)。'
 /** 中継が返す、利用者に見せる文章の長さの上限 */
 const MAX_MESSAGE_LENGTH = 300
 /** 中継は、この名前のヘッダが付いた要求だけを受け付ける(他のサイトの単純な GET と区別するため) */
@@ -58,6 +65,16 @@ export type ReportEvent =
       readonly pending: readonly string[]
     }
   | { readonly type: 'error'; readonly message: string }
+
+/** 中継を呼ぶ。通信そのものに失敗したら(中止を除く)、原因が分かる文章の例外にする */
+async function relayFetch(path: string, signal?: AbortSignal): Promise<Response> {
+  try {
+    return await fetch(`${BASE}${path}`, { headers: HEADERS, signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new Error(CONNECTION_ERROR)
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -114,7 +131,7 @@ function errorMessage(body: unknown, fallback: string): string {
 
 /** 企業名・証券コード・EDINET コードで、提出者を探す */
 export async function searchCompanies(query: string, signal?: AbortSignal): Promise<CompanyHit[]> {
-  const response = await fetch(`${BASE}/companies?q=${encodeURIComponent(query)}`, { headers: HEADERS, signal })
+  const response = await relayFetch(`/companies?q=${encodeURIComponent(query)}`, signal)
   const body = await readJson(response)
   if (!response.ok) throw new Error(errorMessage(body, '企業を探せませんでした。'))
   if (!isRecord(body) || !Array.isArray(body.companies)) throw new Error('企業を探せませんでした。')
@@ -209,26 +226,29 @@ export async function streamReports(
   onEvent: (event: ReportEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(`${BASE}/reports?edinetCode=${encodeURIComponent(edinetCode)}&years=${years}`, {
-    headers: HEADERS,
-    signal,
-  })
+  const response = await relayFetch(`/reports?edinetCode=${encodeURIComponent(edinetCode)}&years=${years}`, signal)
   if (!response.ok || response.body === null) {
     throw new Error(errorMessage(await readJson(response), '書類を探せませんでした。'))
   }
   let finished = false
-  await readLines(response.body, (line) => {
-    const event = parseReportEvent(line)
-    if (event === null) return
-    if (event.type !== 'progress') finished = true
-    onEvent(event)
-  })
+  try {
+    await readLines(response.body, (line) => {
+      const event = parseReportEvent(line)
+      if (event === null) return
+      if (event.type !== 'progress') finished = true
+      onEvent(event)
+    })
+  } catch (error) {
+    // 読んでいる途中でサーバーが止まったとき(中止を除く)
+    if (signal?.aborted) throw error
+    throw new Error(CONNECTION_ERROR)
+  }
   if (!finished) throw new Error('書類の探索が途中で途切れました。もう一度お試しください。')
 }
 
 /** 書類(CSV の zip)を取得する */
 export async function fetchDocument(docID: string, signal?: AbortSignal): Promise<Uint8Array> {
-  const response = await fetch(`${BASE}/document/${encodeURIComponent(docID)}`, { headers: HEADERS, signal })
+  const response = await relayFetch(`/document/${encodeURIComponent(docID)}`, signal)
   if (!response.ok) throw new Error(errorMessage(await readJson(response), '書類を取得できませんでした。'))
   // 読み込む前に大きさを確かめる(取り込みの上限を超える応答で、メモリを使い切らない)
   const declared = Number(response.headers.get('content-length') ?? '0')
