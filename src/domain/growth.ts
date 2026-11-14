@@ -1,3 +1,4 @@
+import { isBasisChange } from './basis'
 import { deriveStatements } from './statements'
 import type { PeriodData } from './types'
 
@@ -19,10 +20,13 @@ export interface GrowthPoint {
   readonly netIncome: number | null
 }
 
-/** 2期目以降について、売上と各利益の前期比を並べる */
+/** 2期目以降について、売上と各利益の前期比を並べる。前期と数字の範囲(連結・単体)が違う期は、すべて null */
 export function buildGrowthSeries(periods: readonly PeriodData[]): readonly GrowthPoint[] {
   return periods.slice(1).map((curr, i) => {
     const prev = periods[i]
+    if (isBasisChange(prev, curr)) {
+      return { label: curr.label, sales: null, grossProfit: null, operatingProfit: null, ordinaryProfit: null, netIncome: null }
+    }
     const p = deriveStatements(prev)
     const c = deriveStatements(curr)
     return {

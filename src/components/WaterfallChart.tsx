@@ -11,8 +11,9 @@ import {
   YAxis,
 } from 'recharts'
 import type { WaterfallRow } from '../domain/waterfall'
-import { formatAmount, formatSignedAmount } from '../lib/format'
+import { amountUnitText, formatAmount, formatSignedAmount, withUnit } from '../lib/format'
 import { AXIS_TICK, GRID_STROKE, ZERO_LINE_STROKE, yAxisWidth } from './chartTheme'
+import { UnitNote } from './ui'
 
 /** 横軸のラベルが重ならないよう、1 項目に確保する最小の幅(px) */
 const MIN_BAR_SLOT_PX = 96
@@ -42,7 +43,15 @@ interface TooltipPayload {
   readonly payload?: WaterfallRow
 }
 
-function WaterfallTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) {
+function WaterfallTooltip({
+  active,
+  payload,
+  unit,
+}: {
+  active?: boolean
+  payload?: TooltipPayload[]
+  unit?: string
+}) {
   const row = payload?.[0]?.payload
   if (!active || !row) {
     return null
@@ -50,7 +59,7 @@ function WaterfallTooltip({ active, payload }: { active?: boolean; payload?: Too
   return (
     <div className="rounded-6 border border-solid-gray-420 bg-white px-3 py-2 shadow-1">
       <p className="font-bold">{row.label}</p>
-      <p className="tnum">{rowLabel(row)}</p>
+      <p className="tnum">{withUnit(rowLabel(row), unit)}</p>
       <p className="text-sm text-solid-gray-700">
         {row.kind === 'total' ? '合計・小計' : '前の項目からの増減'}
       </p>
@@ -98,7 +107,8 @@ export function WaterfallChart({ rows, height = 340, unit }: Props) {
   const summary = rows.map((r) => `${r.label} ${rowLabel(r)}`).join('、')
   return (
     <div>
-      <p className="sr-only">{`${unit === undefined ? '' : `(単位: ${unit})`}${summary}`}</p>
+      <p className="sr-only">{`(${amountUnitText(unit)})${summary}`}</p>
+      <UnitNote>{amountUnitText(unit)}</UnitNote>
       {/* 項目が多いので、狭い画面では 1 項目あたりの幅を確保して、横にスクロールできるようにする */}
       <div className="relative overflow-x-auto">
         <div style={{ minWidth: rows.length * MIN_BAR_SLOT_PX + axisWidth }}>
@@ -112,7 +122,7 @@ export function WaterfallChart({ rows, height = 340, unit }: Props) {
                 height={TICK_LINE_PX * TICK_MAX_LINES + 12}
               />
               <YAxis tick={AXIS_TICK} width={axisWidth} tickFormatter={(v: number) => formatAmount(v)} />
-              <Tooltip content={<WaterfallTooltip />} cursor={{ fill: 'var(--color-solid-gray-50)' }} />
+              <Tooltip content={<WaterfallTooltip unit={unit} />} cursor={{ fill: 'var(--color-solid-gray-50)' }} />
               <ReferenceLine y={0} stroke={ZERO_LINE_STROKE} />
               <Bar dataKey="range" isAnimationActive={false}>
                 {rows.map((row, i) => (

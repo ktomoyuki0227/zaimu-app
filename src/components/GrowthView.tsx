@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { basisChangeLabels, hasMixedBasis, isBasisChange, periodHeading } from '../domain/basis'
 import { buildGrowthSeries, commonSizePl, profitBridge } from '../domain/growth'
 import { growthInsights } from '../domain/insights'
 import { deriveStatements } from '../domain/statements'
@@ -64,7 +65,8 @@ export function GrowthView({ company }: Props) {
   )
   const staircase = useMemo(() => plStaircase(selected), [selected])
   const bridge = useMemo(() => {
-    if (previous === null) return null
+    // 前期と数字の範囲(連結・単体)が違うと、増減の要因に分けられない
+    if (previous === null || isBasisChange(previous, selected)) return null
     const b = profitBridge(previous, selected)
     return buildWaterfall([
       { label: '前期の経常利益', value: b.start, kind: 'total' },
@@ -72,6 +74,8 @@ export function GrowthView({ company }: Props) {
       { label: '当期の経常利益', value: b.end, kind: 'total' },
     ])
   }, [previous, selected])
+  const mixed = hasMixedBasis(periods)
+  const basisChanges = useMemo(() => (mixed ? basisChangeLabels(periods) : []), [mixed, periods])
   const insights = useMemo(
     () => (previous === null ? [] : growthInsights(previous, selected)),
     [previous, selected],
@@ -103,7 +107,7 @@ export function GrowthView({ company }: Props) {
           >
             {periods.map((p, i) => (
               <option key={`${p.label}-${i}`} value={i}>
-                {p.label}
+                {periodHeading(p, mixed)}
               </option>
             ))}
           </select>
@@ -130,7 +134,7 @@ export function GrowthView({ company }: Props) {
       <div className="mt-12 grid grid-cols-1 gap-x-6 lg:grid-cols-2 [&>section]:mt-12 lg:[&>section]:mt-0">
         <Section title="売上高の推移" lead="年ごとの売上高です。">
           <Panel>
-            <SalesTrendChart trend={trend} axisWidth={amountAxisWidth} unit={company.unit} />
+            <SalesTrendChart trend={trend} basisChanges={basisChanges} axisWidth={amountAxisWidth} unit={company.unit} />
           </Panel>
         </Section>
 
@@ -139,7 +143,7 @@ export function GrowthView({ company }: Props) {
           lead="営業・経常・当期純利益です。売上が伸びているのに線が寝ている期は、儲けにくくなっているサインです。"
         >
           <Panel>
-            <ProfitTrendChart trend={trend} axisWidth={amountAxisWidth} unit={company.unit} />
+            <ProfitTrendChart trend={trend} basisChanges={basisChanges} axisWidth={amountAxisWidth} unit={company.unit} />
           </Panel>
         </Section>
       </div>
@@ -159,7 +163,11 @@ export function GrowthView({ company }: Props) {
       >
         <Panel>
           {bridge === null ? (
-            <p>最初の期には前期がないため、増減要因は表示できません。2 期目以降を選んでください。</p>
+            <p>
+              {previous !== null && isBasisChange(previous, selected)
+                ? '前期と数字の範囲(連結・単体)が違うため、増減の要因には分けられません。'
+                : '最初の期には前期がないため、増減要因は表示できません。2 期目以降を選んでください。'}
+            </p>
           ) : (
             <WaterfallChart rows={bridge} unit={company.unit} />
           )}
@@ -176,7 +184,7 @@ export function GrowthView({ company }: Props) {
             lead="金額の大小に関係なく、伸び方だけを同じ物差しで比べます。営業利益の線が売上高の線より上にあれば、売上の伸び以上に利益が増えています。"
           >
             <Panel>
-              <GrowthRateChart growth={growth} />
+              <GrowthRateChart growth={growth} basisChanges={basisChanges} />
             </Panel>
           </Section>
 
@@ -185,7 +193,7 @@ export function GrowthView({ company }: Props) {
             lead="売上 100 のうち、原価・販管費に何%使い、営業利益が何%残ったかを期ごとに並べます。黒い点線が売上高の 100% で、棒がこの線を超えている期は営業赤字です。"
           >
             <Panel>
-              <CompositionChart composition={composition} />
+              <CompositionChart composition={composition} basisChanges={basisChanges} />
             </Panel>
           </Section>
         </div>

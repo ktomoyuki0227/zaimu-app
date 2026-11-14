@@ -1,3 +1,4 @@
+import { basisChangeNote, isBasisChange } from './basis'
 import { classifyGrowthPattern, commonSizePl, growthRate } from './growth'
 import { deriveStatements } from './statements'
 import type { PeriodData } from './types'
@@ -20,6 +21,10 @@ function signed(value: number): string {
  * 前期の売上が 0 などで比べられないときは空配列。
  */
 export function growthInsights(previous: PeriodData, current: PeriodData): readonly string[] {
+  // 連結と単体の数字を比べると、増減が実際の成長と違って見えるので、比べない
+  if (isBasisChange(previous, current)) {
+    return [basisChangeNote(previous, current)]
+  }
   const p = deriveStatements(previous)
   const c = deriveStatements(current)
 

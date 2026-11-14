@@ -1,3 +1,4 @@
+import { basisChangeLabels, basisSummary, hasMixedBasis } from '../domain/basis'
 import type { Company } from '../domain/types'
 import { companyLabel } from '../lib/format'
 import { BUTTON_SECONDARY } from './styles'
@@ -20,6 +21,8 @@ interface Props {
 
 /** 分析のページの見出し: 一覧へ戻るボタン・企業名・4 つのタブ */
 export function CompanyHeader({ company, tab, onBack, onTab }: Props) {
+  const summary = basisSummary(company.periods)
+  const changes = hasMixedBasis(company.periods) ? basisChangeLabels(company.periods) : []
   return (
     <header className="border-b border-solid-gray-420 bg-white">
       <div className="mx-auto max-w-[70rem] px-4 pt-4 sm:px-6">
@@ -34,6 +37,13 @@ export function CompanyHeader({ company, tab, onBack, onTab }: Props) {
           {company.periods.length} 期分
           {company.unit !== undefined ? ` ・ 金額の単位: ${company.unit}` : null}
         </p>
+        {summary !== null ? <p className="mt-1 text-solid-gray-800">数字の範囲: {summary}</p> : null}
+        {changes.length > 0 ? (
+          <p role="note" className="mt-2 rounded-8 border border-yellow-900 bg-yellow-50 p-3 text-yellow-1100">
+            <span aria-hidden="true">△ </span>
+            連結と単体の数字が混ざっています。範囲が変わる期({changes.join('、')})は、範囲が違うため、前期との増減を計算していません。
+          </p>
+        ) : null}
 
         <nav aria-label="表示する内容" className="mt-3">
           <ul className="-mb-px flex list-none gap-1 overflow-x-auto p-0">

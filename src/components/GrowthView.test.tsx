@@ -37,6 +37,26 @@ describe('GrowthView: 読み上げ用の要約', () => {
     expect(text).toContain('売上高の推移(単位: 百万円)')
   })
 
+  test('金額のグラフ 4 つ(売上高・利益の推移、PL 階段、経常利益の増減要因)の上に、単位を画面に出す', () => {
+    const { container } = render(<GrowthView company={{ ...SAMPLE_COMPANY, unit: '百万円' }} />)
+    const notes = [...container.querySelectorAll('p.text-right')].map((p) => p.textContent)
+    expect(notes.filter((t) => t === '単位: 百万円')).toHaveLength(4)
+  })
+
+  test('割合のグラフ 2 つには、何の割合かを添えて、単位(%)を出す', () => {
+    const { container } = render(<GrowthView company={{ ...SAMPLE_COMPANY, unit: '百万円' }} />)
+    const notes = [...container.querySelectorAll('p.text-right')].map((p) => p.textContent)
+    expect(notes).toContain('単位: %(前期からの増減率)')
+    expect(notes).toContain('単位: %(売上高を 100% としたときの割合)')
+  })
+
+  test('単位の記録が無い企業は、金額のグラフに「単位: 不明」と出す(単位を、黙って省かない)', () => {
+    const { unit: _unit, ...withoutUnit } = SAMPLE_COMPANY
+    const { container } = render(<GrowthView company={withoutUnit} />)
+    const notes = [...container.querySelectorAll('p.text-right')].map((p) => p.textContent)
+    expect(notes.filter((t) => t === '単位: 不明')).toHaveLength(4)
+  })
+
   test('売上高が 0 以下の期は、0% の棒にせず、計算できないことを書く', () => {
     const zeroSales: Company = {
       ...SAMPLE_COMPANY,

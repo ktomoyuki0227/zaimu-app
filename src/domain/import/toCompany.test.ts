@@ -85,3 +85,15 @@ describe('toCompany', () => {
     expect(result.errors.length).toBeGreaterThan(0)
   })
 })
+
+describe('toCompany: 期の範囲(連結・単体)', () => {
+  test('抽出結果の範囲(連結)を、すべての期に付ける', () => {
+    const company = toCompany(extract(), 'x')
+    expect(company?.periods.map((p) => p.basis)).toEqual(['consolidated', 'consolidated'])
+  })
+
+  test('個別(単体)の書類なら、単体を付ける', () => {
+    const company = toCompany(extract({ individualOnly: true }), 'x')
+    expect(company?.periods.every((p) => p.basis === 'individual')).toBe(true)
+  })
+})

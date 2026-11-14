@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { formatChange, formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel } from './format'
+import { amountUnitText, formatChange, formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel, withUnit } from './format'
 
 describe('formatMetric', () => {
   test('単位ごとの桁数で表示する', () => {
@@ -75,5 +75,17 @@ describe('formatChange', () => {
   test('どちらかが算出できないときは、比較できない', () => {
     expect(formatChange('%', null, 10)).toBe('前期との比較はできません')
     expect(formatChange('%', 10, null)).toBe('前期との比較はできません')
+  })
+})
+
+describe('単位の表示', () => {
+  test('単位があればそのまま、記録が無ければ「不明」と書く(省かない)', () => {
+    expect(amountUnitText('百万円')).toBe('単位: 百万円')
+    expect(amountUnitText(undefined)).toBe('単位: 不明')
+  })
+
+  test('金額の文字に単位を添える。単位が無ければ、文字だけ', () => {
+    expect(withUnit('2,313,051', '百万円')).toBe('2,313,051 百万円')
+    expect(withUnit('2,313,051', undefined)).toBe('2,313,051')
   })
 })

@@ -368,3 +368,31 @@ describe('extractFromFacts: 注記', () => {
     expect(result.notes.some((n) => n.includes('非支配株主'))).toBe(true)
   })
 })
+
+describe('extractFromFacts: 今期から連結を作り始めた会社', () => {
+  /** 当期は連結、前期は単体の数字だけがある書類(連結の前期が無い) */
+  function firstConsolidated() {
+    const current = fixtureRows({ noPrior: true })
+    const priorIndividual = fixtureRows({ individualOnly: true }).filter((r) => r.contextId.startsWith('Prior1Year'))
+    const parsed = parseEdinetCsv(buildCsvText([...current, ...priorIndividual]), 100_000)
+    if (!parsed.ok) throw new Error(parsed.reason)
+    return extractFromFacts(parsed.facts, parsed.info)
+  }
+
+  test('当期(連結)だけを取り込み、前期が単体であることと、並べると増減が大きく見えることを知らせる', () => {
+    const result = firstConsolidated()
+    expect(result.errors).toEqual([])
+    expect(result.consolidation).toBe('consolidated')
+    expect(result.periods.map((p) => p.label)).toEqual(['2025年3月期'])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain('今期から連結財務諸表を作り始めた')
+    expect(result.warnings[0]).toContain('2024年3月期')
+    expect(result.warnings[0]).toContain('切り替わりの前後の増減')
+    expect(result.needsReview).toBe(true)
+  })
+
+  test('前期の単体の数字も無いときは、これまでの文章(前期のデータが書類にありません)のまま', () => {
+    const result = extract({ noPrior: true })
+    expect(result.warnings).toEqual(['前期(2024年3月期)のデータが書類にありません。当期だけを取り込みます。'])
+  })
+})

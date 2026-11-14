@@ -129,6 +129,24 @@ describe('App: ファイルの取り込みと取り消し', () => {
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1)
   })
 
+  test('単体の期のあとに連結の書類を取り込むと、範囲の切り替わりを知らせ、切り替わりの前後の増減は出さない', async () => {
+    render(<App />)
+    // 2025 年 3 月期の単体(2024・2025 年 3 月期)のあと、2026 年 3 月期の連結(2025・2026 年 3 月期)
+    await pickFile(csvFile('単体.csv', { individualOnly: true }))
+    await screen.findByRole('heading', { level: 1, name: 'サンプル製作所(架空)' })
+    fireEvent.click(screen.getByText('← 企業の一覧へ'))
+    await pickFile(csvFile('連結.csv', { currentEnd: '2026-03-31' }))
+    await screen.findByRole('heading', { level: 1, name: 'サンプル製作所(架空)' })
+    // 2024 年は単体、2025 年・2026 年は連結(2025 年は、あとから読んだ連結に置き換わる)
+    expect(screen.getByText(/数字の範囲: 2024年3月期は単体、2025年3月期〜2026年3月期は連結/)).toBeTruthy()
+    expect(screen.getByRole('note').textContent).toContain('2025年3月期')
+    // 概要の主要な数字は、最新の期(2026 年)と前期(2025 年)がどちらも連結なので、前期との差が出る
+    expect(screen.queryAllByText('前期との比較はできません')).toHaveLength(0)
+    // 保存した内容にも、範囲が入っている
+    expect(window.localStorage.getItem(PORTFOLIO_KEY)).toContain('"basis":"consolidated"')
+    expect(window.localStorage.getItem(PORTFOLIO_KEY)).toContain('"basis":"individual"')
+  })
+
   test('読めないファイルは、エラーを知らせ、一覧は変えない', async () => {
     render(<App />)
     await pickFile(new File(['hello'], 'bad.txt', { type: 'text/plain' }))

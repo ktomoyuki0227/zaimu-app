@@ -37,9 +37,14 @@ export interface IncomeStatementInput {
   readonly operatingCashFlow?: number
 }
 
+/** 数字の範囲。連結: 子会社を含むグループ全体 / 単体: その会社だけ */
+export type Basis = 'consolidated' | 'individual'
+
 /** 1期分の財務データ */
 export interface PeriodData {
   readonly label: string // 例: "2024年3月期"
+  /** 数字の範囲。ファイルから取り込んだ期には付く(古い保存データや練習用データには無い) */
+  readonly basis?: Basis
   readonly bs: BalanceSheetInput
   readonly pl: IncomeStatementInput
 }

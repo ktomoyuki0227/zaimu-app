@@ -54,6 +54,7 @@ function scalePeriod(period: PeriodData, from: number, to: number): PeriodData {
   const convert = (value: number): number => (value * from) / to
   return {
     label: period.label,
+    ...(period.basis === undefined ? {} : { basis: period.basis }),
     bs: scaleRecord<BalanceSheetInput>(period.bs, convert),
     pl: scaleRecord<IncomeStatementInput>(period.pl, convert),
   }

@@ -48,3 +48,8 @@ export function LevelBadge({ level }: { readonly level: EvaluationLevel }) {
     </span>
   )
 }
+
+/** グラフ・表の右上に置く、単位の表示(例: 「単位: 百万円」)。数字だけが並ぶ図に、必ず添える */
+export function UnitNote({ children }: { readonly children: string }) {
+  return <p className="tnum mb-1 text-right text-sm text-solid-gray-700">{children}</p>
+}

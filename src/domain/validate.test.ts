@@ -48,6 +48,21 @@ describe('parseCompany', () => {
     expect(parseCompany({ ...valid, name: '𠮷'.repeat(101) })).toBeNull()
   })
 
+  test('期の範囲(basis)は任意。連結・単体の 2 つの値だけを受け付け、往復しても残る', () => {
+    const withBasis = (basis: unknown) => ({ ...valid, periods: [{ ...basePeriod, basis }] })
+    expect(parseCompany(withBasis('consolidated'))?.periods[0].basis).toBe('consolidated')
+    expect(parseCompany(withBasis('individual'))?.periods[0].basis).toBe('individual')
+    expect(parseCompany(valid)?.periods[0]).not.toHaveProperty('basis')
+    const roundTripped = parseCompany(JSON.parse(JSON.stringify(withBasis('consolidated'))))
+    expect(roundTripped?.periods[0].basis).toBe('consolidated')
+  })
+
+  test('範囲(basis)が決まった値以外(文字列・数・null・オブジェクト)なら、壊れたデータとして null', () => {
+    for (const bad of ['group', '', 1, null, {}, ['consolidated']]) {
+      expect(parseCompany({ ...valid, periods: [{ ...basePeriod, basis: bad }] }), String(bad)).toBeNull()
+    }
+  })
+
   test('オブジェクト以外は null', () => {
     expect(parseCompany(null)).toBeNull()
     expect(parseCompany('abc')).toBeNull()

@@ -12,6 +12,7 @@ import {
 } from '../domain/catalog'
 import { calcMetrics, type UnavailableReason } from '../domain/metrics'
 import type { Company } from '../domain/types'
+import { basisChangeNote, hasMixedBasis, isBasisChange, periodHeading } from '../domain/basis'
 import { formatChange, formatMetric } from '../lib/format'
 import { gapText } from '../lib/gap'
 import { Bullet } from './Bullet'
@@ -67,12 +68,14 @@ interface CardProps {
   readonly series: readonly (number | null)[]
   /** 各期の「算出できなかった理由」。算出できた期は undefined */
   readonly reasons: readonly (UnavailableReason | undefined)[]
+  /** 前期と数字の範囲(連結・単体)が違うとき、前期と比べない理由。比べられるなら null */
+  readonly previousNote: string | null
 }
 
-function MetricCard({ def, labels, series, reasons }: CardProps) {
+function MetricCard({ def, labels, series, reasons, previousNote }: CardProps) {
   const now = series[series.length - 1] ?? null
   const nowReason = reasons[reasons.length - 1]
-  const before = series.length > 1 ? (series[series.length - 2] ?? null) : null
+  const before = previousNote === null && series.length > 1 ? (series[series.length - 2] ?? null) : null
   const level = evaluateMetric(def.key, now, nowReason)
   const guide = guidelineText(def.key)
   const gap = gapText(def, gapToGuideline(def.key, now))
@@ -87,7 +90,7 @@ function MetricCard({ def, labels, series, reasons }: CardProps) {
         {formatMetric(now, def.unit)}
       </p>
       <p className={now === null && nowReason ? 'font-bold text-solid-gray-900' : 'text-solid-gray-700'}>
-        {now === null && nowReason ? unavailableText(nowReason) : formatChange(def.unit, now, before)}
+        {now === null && nowReason ? unavailableText(nowReason) : previousNote !== null ? '前期とは比べません(範囲が違います)' : formatChange(def.unit, now, before)}
       </p>
 
       {guide ? (
@@ -127,6 +130,14 @@ interface Props {
 export function MetricsView({ company, group }: Props) {
   const metrics = useMemo(() => company.periods.map(calcMetrics), [company.periods])
   const labels = useMemo(() => company.periods.map((p) => p.label), [company.periods])
+  // 連結と単体が混ざる会社では、表の見出しに範囲を添える。切り替わりの前後は、前期との比較をしない
+  const mixed = hasMixedBasis(company.periods)
+  const headings = useMemo(() => company.periods.map((p) => periodHeading(p, mixed)), [company.periods, mixed])
+  const last = company.periods.length - 1
+  const previousNote =
+    last > 0 && isBasisChange(company.periods[last - 1], company.periods[last])
+      ? basisChangeNote(company.periods[last - 1], company.periods[last])
+      : null
   const defs = useMemo(() => METRIC_CATALOG.filter((d) => d.group === group), [group])
   const copy = GROUP_COPY[group]
 
@@ -136,6 +147,12 @@ export function MetricsView({ company, group }: Props) {
   return (
     <div>
       <Section title={`${copy.title}の指標(${labels[labels.length - 1]})`} lead={copy.lead}>
+        {previousNote !== null ? (
+          <p role="note" className="mb-4 rounded-8 border border-yellow-900 bg-yellow-50 p-3 text-yellow-1100">
+            <span aria-hidden="true">△ </span>
+            {previousNote}
+          </p>
+        ) : null}
         {SUBGROUPS[group].map((sub) => (
           <div key={sub.title} className="mt-8 first:mt-0">
             <h3 className="text-lg font-bold text-solid-gray-900">{sub.title}</h3>
@@ -150,6 +167,7 @@ export function MetricsView({ company, group }: Props) {
                     labels={labels}
                     series={metrics.map((m) => m[key])}
                     reasons={metrics.map((m) => m.unavailable[key])}
+                    previousNote={previousNote}
                   />
                 )
               })}
@@ -173,7 +191,7 @@ export function MetricsView({ company, group }: Props) {
                   <th scope="col" className="py-2 pr-4 text-left">
                     指標
                   </th>
-                  {labels.map((label, i) => (
+                  {headings.map((label, i) => (
                     <th key={`${label}-${i}`} scope="col" className="px-3 py-2">
                       {label}
                     </th>

@@ -1,6 +1,6 @@
 import { UNIT_DIVISOR } from '../units'
 import { parseCompany } from '../validate'
-import type { AmountUnit, Company, IncomeStatementInput, PeriodData } from '../types'
+import type { AmountUnit, Basis, Company, IncomeStatementInput, PeriodData } from '../types'
 import type { ExtractedPeriod, ExtractionResult } from './types'
 
 /** 総資産(円)の大きさに合わせて、画面で扱いやすい金額の単位を選ぶ */
@@ -26,14 +26,14 @@ function values<K extends string>(
   return out
 }
 
-function toPeriod(extracted: ExtractedPeriod, divisor: number): PeriodData {
+function toPeriod(extracted: ExtractedPeriod, divisor: number, basis: Basis): PeriodData {
   const pl: IncomeStatementInput = {
     ...values(extracted.pl, divisor),
     ...(extracted.operatingCashFlow === null
       ? {}
       : { operatingCashFlow: extracted.operatingCashFlow.value / divisor }),
   }
-  return { label: extracted.label, bs: values(extracted.bs, divisor), pl }
+  return { label: extracted.label, basis, bs: values(extracted.bs, divisor), pl }
 }
 
 /** 資産合計(円)。単位の選択に使う(BS の資産側の項目の合計) */
@@ -60,12 +60,13 @@ export function toCompany(result: ExtractionResult, id: string): Company | null 
   const latest = result.periods[result.periods.length - 1]
   const unit = chooseUnit(assetsYen(latest))
   const divisor = UNIT_DIVISOR[unit]
+  const basis: Basis = result.consolidation
   const company: Company = {
     id,
     name: result.companyName,
     unit,
     ...(result.edinetCode === null ? {} : { edinetCode: result.edinetCode }),
-    periods: result.periods.map((p) => toPeriod(p, divisor)),
+    periods: result.periods.map((p) => toPeriod(p, divisor, basis)),
   }
   // 外から来た値なので、手入力や保存データと同じ検証を最後に必ず通す
   return parseCompany(company)

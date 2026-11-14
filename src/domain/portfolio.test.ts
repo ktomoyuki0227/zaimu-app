@@ -77,6 +77,24 @@ describe('mergeCompany', () => {
     expect(merged.unit).toBe('円')
   })
 
+  test('期の範囲(連結・単体)は、統合しても、単位をそろえても残る', () => {
+    const existing = company('c', '甲', [{ ...period('2024年12月期', 5_000_000), basis: 'individual' }], '千円')
+    const incoming = company('c', '甲', [{ ...period('2025年12月期', 8_000), basis: 'consolidated' }], '百万円')
+    const merged = mergeCompany(existing, incoming)
+    expect(merged.periods.map((p) => [p.label, p.basis])).toEqual([
+      ['2024年12月期', 'individual'],
+      ['2025年12月期', 'consolidated'],
+    ])
+  })
+
+  test('同じ期を、あとから違う範囲で読み込んだら、あとの範囲で置き換わる', () => {
+    const existing = company('c', '甲', [{ ...period('2025年12月期', 100), basis: 'individual' }])
+    const incoming = company('c', '甲', [{ ...period('2025年12月期', 130), basis: 'consolidated' }])
+    const merged = mergeCompany(existing, incoming)
+    expect(merged.periods).toHaveLength(1)
+    expect(merged.periods[0].basis).toBe('consolidated')
+  })
+
   test('期の数が上限を超えたら、古い期から落とす', () => {
     const many = Array.from({ length: MAX_PERIODS }, (_, i) => period(`${2000 + i}年3月期`, 100 + i))
     const merged = mergeCompany(company('c', '甲', many), company('c', '甲', [period('2030年3月期', 999)]))

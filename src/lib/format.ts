@@ -69,3 +69,13 @@ export function formatChange(unit: MetricUnit, now: number | null, before: numbe
   const suffix = unit === '%' ? 'pt' : unit
   return `前期から ${diff > 0 ? '↑ +' : '↓ '}${diff.toFixed(digits)}${suffix}`
 }
+
+/** 金額の単位の表示。単位の記録が無い(古い保存データ)ときは、「不明」と書く */
+export function amountUnitText(unit: string | undefined): string {
+  return `単位: ${unit ?? '不明'}`
+}
+
+/** 金額の文字に、単位を添える(吹き出しなど、単位が近くに無い場所で使う) */
+export function withUnit(text: string, unit: string | undefined): string {
+  return unit === undefined ? text : `${text} ${unit}`
+}

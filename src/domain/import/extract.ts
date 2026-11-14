@@ -138,6 +138,19 @@ interface PriorReading {
   readonly warnings: readonly string[]
 }
 
+/**
+ * 今期から連結財務諸表を作り始めた会社の、前期の扱いの説明。
+ * 前期の単体と今期の連結は範囲が違うので、並べて増減を出すと、実際の成長と違って見える(子会社の分だけ大きく見える)。
+ * そのため、取り込んだあとは、切り替わりの前後の増減を計算しない(basis.ts)。
+ */
+function firstConsolidatedWarning(priorLabel: string): string {
+  return (
+    `今期から連結財務諸表を作り始めたため、前期(${priorLabel})の連結の数字は書類にありません(前期は単体の数字だけです)。` +
+    '当期(連結)だけを取り込みます。同じ企業に、前の期を単体で取り込み済みのときは、' +
+    '連結と単体は範囲が違うので、切り替わりの前後の増減(売上高の伸びなど)は計算せず、「比べられません」と表示します。'
+  )
+}
+
 /** 前期を読む。前期が無い・読めないときは、当期だけを取り込み、その理由を確認事項として返す */
 function readPrior(
   facts: readonly SourceFact[],
@@ -151,7 +164,10 @@ function readPrior(
   const label = periodLabel(priorEndDate)
   const prior = collect(facts, 'prior', scope, profile)
   if (!prior.entries.has(profile.assetsName)) {
-    return { period: null, warnings: [`前期(${label})のデータが書類にありません。当期だけを取り込みます。`] }
+    // 連結の書類で、前期の連結が無く、前期の単体だけがあるのは、今期から連結財務諸表を作り始めた会社
+    const individualOnly =
+      scope === 'primary' && collect(facts, 'prior', 'individual', profile).entries.has(profile.assetsName)
+    return { period: null, warnings: [individualOnly ? firstConsolidatedWarning(label) : `前期(${label})のデータが書類にありません。当期だけを取り込みます。`] }
   }
   const warnings = prior.conflicts.length > 0 ? [conflictWarning(label, prior.conflicts)] : []
   const reading = profile.read(prior.entries, priorEndDate, label)

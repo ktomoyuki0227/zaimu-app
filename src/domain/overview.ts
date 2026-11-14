@@ -7,6 +7,7 @@ import {
   type MetricUnit,
 } from './catalog'
 import { gapToGuideline } from './benchmark'
+import { basisChangeNote, isBasisChange } from './basis'
 import { classifyGrowthPattern, growthRate, type GrowthPattern } from './growth'
 import { calcMetrics, type UnavailableReason } from './metrics'
 import { deriveStatements } from './statements'
@@ -38,6 +39,8 @@ export interface AxisSummary {
   readonly counts: LevelCounts | null
   /** 成長性のときだけ入る。前期がない・比べられないときは null */
   readonly growth: GrowthSummary | null
+  /** 判定できない理由を、利用者に伝える文(連結と単体の切り替わりなど)。無ければ null */
+  readonly note: string | null
 }
 
 /** 気をつけたい指標(要注意・注意) */
@@ -103,13 +106,16 @@ function metricAxis(key: AxisKey, label: string, group: MetricGroup, period: Per
       tally[level] += 1
     }
   }
-  return { key, label, verdict: verdictOf(tally), counts: tally, growth: null }
+  return { key, label, verdict: verdictOf(tally), counts: tally, growth: null, note: null }
 }
 
 function growthAxis(previous: PeriodData | null, latest: PeriodData): AxisSummary {
-  const base = { key: 'growth', label: '成長性', counts: null } as const
+  const base = { key: 'growth', label: '成長性', counts: null, note: null } as const
   if (previous === null) {
     return { ...base, verdict: 'unknown', growth: null }
+  }
+  if (isBasisChange(previous, latest)) {
+    return { ...base, verdict: 'unknown', growth: null, note: basisChangeNote(previous, latest) }
   }
   const salesGrowth = growthRate(previous.pl.sales, latest.pl.sales)
   const operatingProfitGrowth = growthRate(
@@ -150,7 +156,9 @@ function topConcerns(period: PeriodData, limit: number): readonly Concern[] {
   return concerns.slice(0, limit).map((c) => c.concern)
 }
 
-function kpis(company: Company, previous: PeriodData | null, latest: PeriodData): readonly Kpi[] {
+function kpis(company: Company, rawPrevious: PeriodData | null, latest: PeriodData): readonly Kpi[] {
+  // 範囲(連結・単体)が違う前期とは、増減を出さない
+  const previous = rawPrevious !== null && !isBasisChange(rawPrevious, latest) ? rawPrevious : null
   const now = calcMetrics(latest)
   const before = previous === null ? null : calcMetrics(previous)
   return [

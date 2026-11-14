@@ -62,8 +62,13 @@ function parsePeriod(raw: unknown): PeriodData | null {
   if (bs === null || pl === null) {
     return null
   }
+  // 範囲は任意。あるなら、決まった 2 つの値のどちらかでなければならない(それ以外は、壊れたデータ)
+  if (raw.basis !== undefined && raw.basis !== 'consolidated' && raw.basis !== 'individual') {
+    return null
+  }
   return {
     label: raw.label,
+    ...(raw.basis === undefined ? {} : { basis: raw.basis }),
     bs: bs as unknown as BalanceSheetInput,
     pl: pl as unknown as IncomeStatementInput,
   }

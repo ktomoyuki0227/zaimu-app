@@ -19,6 +19,9 @@ const AXIS_BORDER: Record<EvaluationLevel, string> = {
 }
 
 function axisDetail(axis: AxisSummary): string {
+  if (axis.note !== null) {
+    return axis.note
+  }
   if (axis.growth !== null) {
     const { pattern, salesGrowth, operatingProfitGrowth } = axis.growth
     return `${pattern}(売上高 ${formatSignedPercent(salesGrowth)}、営業利益 ${formatSignedPercent(operatingProfitGrowth)})`
@@ -70,7 +73,9 @@ function KpiTile({ kpi }: { readonly kpi: Kpi }) {
       <p className="text-solid-gray-800">{kpi.label}</p>
       <p className="tnum mt-1 text-[2rem] font-bold leading-tight text-solid-gray-900">
         {value}
-        {kpi.id === 'sales' && kpi.unit ? <span className="ml-1 text-base font-normal text-solid-gray-700">{kpi.unit}</span> : null}
+        {kpi.id === 'sales' ? (
+          <span className="ml-1 text-base font-normal text-solid-gray-700">{kpi.unit === '' ? '(単位不明)' : kpi.unit}</span>
+        ) : null}
       </p>
       <p className="tnum text-solid-gray-700">{kpiChange(kpi)}</p>
     </li>
