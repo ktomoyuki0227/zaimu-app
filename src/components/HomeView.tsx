@@ -62,7 +62,7 @@ function CompanyCard({
           type="button"
           onClick={onRemove}
           aria-label={`${company.name || '(名前なし)'}を一覧から削除`}
-          className="text-blue-900 underline underline-offset-4 hover:text-blue-1000"
+          className="min-h-11 min-w-11 px-2 text-blue-900 underline underline-offset-4 hover:text-blue-1000"
         >
           削除
         </button>
@@ -176,7 +176,7 @@ export function HomeView({
         open={fileImportIsMain || undefined}
         className="mt-12 rounded-8 border border-solid-gray-420 bg-solid-gray-50 p-4 sm:p-6"
       >
-        <summary className="cursor-pointer text-lg font-bold">
+        <summary className="min-h-11 cursor-pointer py-2 text-lg font-bold">
           手元のファイルから取り込む
           <span className="ml-2 text-base font-normal text-solid-gray-700">(ファイルは画面のどこにドロップしても読めます)</span>
         </summary>

@@ -170,7 +170,8 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     label: 'インタレスト・カバレッジ・レシオ',
     unit: '倍',
     formula: '(営業利益 + 営業外収益) ÷ 支払利息',
-    meaning: '本業の儲けで支払利息を何回分まかなえるか。',
+    meaning:
+      '本業の儲けで支払利息を何回分まかなえるか。教科書では分子を「営業利益 + 受取利息・配当金」としますが、このアプリは営業外収益の全体を使う概算です(為替差益なども含むため、やや高めに出ます)。',
     guideline: { direction: 'higher', good: 3, danger: 1 },
   },
 ]

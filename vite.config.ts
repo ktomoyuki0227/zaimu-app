@@ -1,9 +1,13 @@
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { loadEnv, type Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { edinetLocalApi } from './server/edinet/vitePlugin.ts'
+
+/** このファイルのあるフォルダ(プロジェクトの根)。どのフォルダから起動しても、.env とキャッシュの場所が変わらないようにする */
+const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url))
 
 /**
  * 本番ビルドに入れる Content-Security-Policy。
@@ -49,8 +53,8 @@ export default defineConfig(({ mode }) => ({
     // EDINET から有価証券報告書を取得する、この PC 内だけの API(開発・確認用サーバーにだけ足す)。
     // API キーは .env の EDINET_API_KEY から読む。VITE_ で始まらない名前なので、画面のコードには渡らない
     edinetLocalApi({
-      apiKey: loadEnv(mode, process.cwd(), 'EDINET_').EDINET_API_KEY,
-      cacheDir: join(process.cwd(), '.cache'),
+      apiKey: loadEnv(mode, PROJECT_ROOT, 'EDINET_').EDINET_API_KEY,
+      cacheDir: join(PROJECT_ROOT, '.cache'),
     }),
   ],
   build: {
@@ -61,10 +65,12 @@ export default defineConfig(({ mode }) => ({
     // 画面は同じオリジンから開くので、ほかのオリジンからの通信(CORS)は許可しない。
     // 既定のままだと、別のポートの localhost のページからも、中継の API を呼べてしまう
     cors: false,
+    // この PC の中だけで待ち受ける(既定と同じ。EDINET の中継を、LAN や外に見せない意思をここに残す)
+    host: 'localhost',
     fs: {
       // 既定の拒否リスト(.env など)に、取得結果のキャッシュ(調べた企業の履歴)を足す。
       // fs.deny を指定すると既定が置き換わりうるので、既定の分も書く
-      deny: ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.cache/**'],
+      deny: ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.cache/**', '**/.claude/**'],
     },
     // キャッシュの書き込みで、開発サーバーが反応しないようにする
     watch: { ignored: ['**/.cache/**'] },

@@ -124,7 +124,7 @@ function MetricCard({ def, labels, series, reasons }: CardProps) {
       )}
 
       <details className="mt-3">
-        <summary className="cursor-pointer font-bold text-blue-900 underline underline-offset-4">
+        <summary className="min-h-11 cursor-pointer py-2 font-bold text-blue-900 underline underline-offset-4">
           計算式と見方
         </summary>
         <p className="mt-2">

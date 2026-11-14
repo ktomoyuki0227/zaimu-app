@@ -1,3 +1,4 @@
+import { readBoundedBody } from './boundedBody.ts'
 import { parseDocumentList, type ListedDocument } from './documents.ts'
 import { UserFacingError } from './errors.ts'
 import { DOC_ID, isRealDate } from './patterns.ts'
@@ -32,7 +33,8 @@ export interface EdinetClientOptions {
   readonly minIntervalMs?: number
   readonly timeoutMs?: number
   readonly cooldownMs?: number
-  readonly sleep?: (ms: number) => Promise<void>
+  /** 待つ関数(テストで差し替える)。signal が中止されたら、待つのをやめて例外を投げる */
+  readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
   readonly now?: () => number
 }
 
@@ -41,6 +43,25 @@ export interface EdinetClient {
   readonly listDocuments: (date: string, signal?: AbortSignal) => Promise<ListedDocument[]>
   /** 書類(有価証券報告書など)の CSV の zip */
   readonly downloadCsvZip: (docID: string, signal?: AbortSignal) => Promise<Uint8Array>
+}
+
+/** 中止されたら、すぐに待つのをやめる(切断したあとも、間隔の分だけ「実行中」のまま残らないように) */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function httpErrorMessage(status: number): string {
@@ -58,6 +79,8 @@ function jsonErrorStatus(body: unknown): number | null {
   if (typeof body !== 'object' || body === null) return null
   const record = body as Record<string, unknown>
   const code = record.statusCode ?? (record.metadata as Record<string, unknown> | undefined)?.status
+  // null や undefined を Number() にかけると 0 になり、ありもしない「ステータス 0 のエラー」になる
+  if (code === null || code === undefined) return null
   const status = Number(code)
   return Number.isFinite(status) && status !== 200 ? status : null
 }
@@ -76,7 +99,7 @@ export function createEdinetClient(options: EdinetClientOptions): EdinetClient {
     minIntervalMs = DEFAULT_MIN_INTERVAL_MS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     cooldownMs = DEFAULT_COOLDOWN_MS,
-    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    sleep = abortableSleep,
     now = Date.now,
   } = options
   if (apiKey.trim() === '') {
@@ -98,7 +121,7 @@ export function createEdinetClient(options: EdinetClientOptions): EdinetClient {
         )
       }
       const wait = lastStarted + minIntervalMs - now()
-      if (wait > 0) await sleep(wait)
+      if (wait > 0) await sleep(wait, signal)
       signal?.throwIfAborted()
       lastStarted = now()
       return task()
@@ -170,20 +193,21 @@ export function createEdinetClient(options: EdinetClientOptions): EdinetClient {
         const response = await request(`/documents/${docID}`, { type: '5' }, signal)
         checkHttp(response)
         const declared = Number(response.headers.get('content-length') ?? '0')
-        if (declared > MAX_DOCUMENT_BYTES) throw new EdinetApiError('書類が大きすぎるため、取得を中止しました。')
+        if (Number.isFinite(declared) && declared > MAX_DOCUMENT_BYTES) throw new EdinetApiError('書類が大きすぎるため、取得を中止しました。')
         const type = response.headers.get('content-type') ?? ''
         if (type.includes('application/json')) {
           const status = jsonErrorStatus(await response.json().catch(() => null))
           noteStatus(status)
           throw new EdinetApiError(status === null ? 'EDINET から書類を取得できませんでした。' : httpErrorMessage(status))
         }
-        let bytes: Uint8Array
+        let bytes: Uint8Array | null
         try {
-          bytes = new Uint8Array(await response.arrayBuffer())
+          // 長さを名乗らない・偽る応答でも、上限を超えたところで読むのをやめる
+          bytes = await readBoundedBody(response, MAX_DOCUMENT_BYTES)
         } catch {
           throw new EdinetApiError('書類の受信が途中で途切れました。しばらくしてからやり直してください。')
         }
-        if (bytes.length > MAX_DOCUMENT_BYTES) throw new EdinetApiError('書類が大きすぎるため、取得を中止しました。')
+        if (bytes === null) throw new EdinetApiError('書類が大きすぎるため、取得を中止しました。')
         // zip の先頭は "PK"。エラーの HTML などを zip として扱わない
         if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
           throw new EdinetApiError('EDINET から zip ではない応答が返りました。')

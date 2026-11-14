@@ -96,14 +96,14 @@ function ReviewBlock({ fileName, result, company, onApply, onCancel }: ReviewPro
         </>
       ) : null}
 
-      {items.length > 0 && company?.unit !== undefined ? (
+      {items.length > 0 ? (
         <>
           <p className="mt-3 font-bold">自動で決めきれなかった項目</p>
           <p>
             0 で仮置きした項目や、差額で求めた項目です。読み込むと、この値のまま分析します
             (仮置きした項目に関わる指標は、実際とずれることがあります)。
           </p>
-          <AttentionTable items={items} unit={company.unit} />
+          <AttentionTable items={items} unit={company?.unit ?? '円'} />
         </>
       ) : null}
 

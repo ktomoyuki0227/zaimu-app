@@ -67,6 +67,16 @@ describe('mergeCompany', () => {
     expect(mergeCompany(existing, incoming).periods.map((p) => p.label)).toEqual(['2025年3月期'])
   })
 
+  test('単位をそろえると金額が上限(1e15)を超えるときは、混ぜずに、あとから読み込んだものだけにする', () => {
+    // 百万円の 9e9(= 9e15 円)を、円の単位にそろえると 9e15。保存できる上限を超える
+    const huge = { ...period('2024年3月期', 9e9), bs: { ...basePeriod.bs } }
+    const existing = company('c', '甲', [huge], '百万円')
+    const incoming = company('c', '甲', [period('2025年3月期', 500)], '円')
+    const merged = mergeCompany(existing, incoming)
+    expect(merged.periods.map((p) => p.label)).toEqual(['2025年3月期'])
+    expect(merged.unit).toBe('円')
+  })
+
   test('期の数が上限を超えたら、古い期から落とす', () => {
     const many = Array.from({ length: MAX_PERIODS }, (_, i) => period(`${2000 + i}年3月期`, 100 + i))
     const merged = mergeCompany(company('c', '甲', many), company('c', '甲', [period('2030年3月期', 999)]))

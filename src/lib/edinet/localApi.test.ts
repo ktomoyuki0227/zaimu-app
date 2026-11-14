@@ -193,3 +193,55 @@ describe('fetchDocument', () => {
     await expect(fetchDocument('S100AAAA')).rejects.toThrow('見つかりません')
   })
 })
+
+describe('中継の応答を、入力として疑う', () => {
+  const company = (extra: Record<string, unknown>) => ({
+    edinetCode: 'E90001',
+    name: 'サンプル製作所',
+    secCode: '12340',
+    fiscalYearEnd: { month: 3, day: 'end' },
+    listed: true,
+    ...extra,
+  })
+
+  test('会社名の制御文字・表示を偽装する文字(右から左への切り替え、ゼロ幅など)は取り除く', async () => {
+    stubFetch(() => json({ companies: [company({ name: '‮サンプル​製作所\n' })] }))
+    const [hit] = await searchCompanies('x')
+    expect(hit.name).toBe('サンプル製作所')
+  })
+
+  test('会社名が空になる提出者は、結果に含めない', async () => {
+    stubFetch(() => json({ companies: [company({ name: '​‮' })] }))
+    expect(await searchCompanies('x')).toEqual([])
+  })
+
+  test('決算日の月・日が範囲外・小数なら、決算日不明(null)にする', async () => {
+    stubFetch(() =>
+      json({
+        companies: [
+          company({ fiscalYearEnd: { month: 99, day: 1 } }),
+          company({ edinetCode: 'E90002', fiscalYearEnd: { month: 3, day: 1.5 } }),
+          company({ edinetCode: 'E90003', fiscalYearEnd: { month: 12, day: 31 } }),
+        ],
+      }),
+    )
+    const hits = await searchCompanies('x')
+    expect(hits.map((h) => h.fiscalYearEnd)).toEqual([null, null, { month: 12, day: 31 }])
+  })
+
+  test('中継のエラーの文章も、制御文字を取り除き、長さを制限する', async () => {
+    stubFetch(() => json({ error: `‮${'あ'.repeat(1_000)}` }, 502))
+    await expect(searchCompanies('x')).rejects.toThrow(/^あ{300}$/)
+  })
+
+  test('取り込みの上限を超える大きさを名乗る書類は、読み込まずに断る', async () => {
+    stubFetch(
+      () =>
+        new Response(Uint8Array.of(0x50, 0x4b), {
+          status: 200,
+          headers: { 'content-length': String(21 * 1024 * 1024) },
+        }),
+    )
+    await expect(fetchDocument('S100AAAA')).rejects.toThrow('大きすぎる')
+  })
+})

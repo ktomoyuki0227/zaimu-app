@@ -1,4 +1,4 @@
-import { MAX_PERIODS, MAX_TEXT_LENGTH } from './limits'
+import { MAX_ABS_AMOUNT, MAX_PERIODS, MAX_TEXT_LENGTH } from './limits'
 import type { BalanceSheetInput, Company, IncomeStatementInput, PeriodData } from './types'
 import { UNIT_DIVISOR } from './units'
 
@@ -59,12 +59,21 @@ function scalePeriod(period: PeriodData, from: number, to: number): PeriodData {
   }
 }
 
+/** どの金額も、保存できる上限(MAX_ABS_AMOUNT)以内か */
+function withinAmountLimit(periods: readonly PeriodData[]): boolean {
+  return periods.every((p) =>
+    [...Object.values(p.bs), ...Object.values(p.pl)].every((v) => Math.abs(v) <= MAX_ABS_AMOUNT),
+  )
+}
+
 /**
  * 同じ企業の、あとから読み込んだデータ(incoming)を、すでにあるデータ(existing)に積み上げる。
  * - 同じ期は、あとから読み込んだ値(遡及修正後)で置き換える
  * - 金額の単位が違えば、あとから読み込んだ側の単位にそろえる
  * - 単位が不明な古いデータは、混ぜると金額がずれるので、あとから読み込んだものだけにする
  * - 期の数が上限を超えたら、古い期から落とす
+ * - 単位をそろえた結果、金額が保存できる上限を超えるときは、混ぜずに、あとから読み込んだものだけにする
+ *   (混ぜて保存すると、次に開いたときに「壊れたデータ」として、一覧全体が読めなくなる)
  */
 export function mergeCompany(existing: Company, incoming: Company): Company {
   const base: Company = {
@@ -86,7 +95,8 @@ export function mergeCompany(existing: Company, incoming: Company): Company {
   const byLabel = new Map<string, PeriodData>()
   for (const p of existingPeriods) byLabel.set(p.label, p)
   for (const p of incoming.periods) byLabel.set(p.label, p)
-  return { ...base, periods: sortPeriods([...byLabel.values()]).slice(-MAX_PERIODS) }
+  const merged = sortPeriods([...byLabel.values()]).slice(-MAX_PERIODS)
+  return withinAmountLimit(merged) ? { ...base, periods: merged } : base
 }
 
 /**

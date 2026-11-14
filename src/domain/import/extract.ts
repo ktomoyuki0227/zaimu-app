@@ -9,6 +9,9 @@ import type {
   SourceFact,
 } from './types'
 
+/** 書類から会社名を読めなかったときの仮の名前 */
+export const UNNAMED_COMPANY_NAME = '取り込んだ会社'
+
 const JPPFS_PREFIX = 'jppfs_cor:'
 const JPIGP_PREFIX = 'jpigp_cor:'
 
@@ -176,7 +179,7 @@ function chooseScope(facts: readonly SourceFact[], profile: Profile): Scope | nu
  * 反映してはいけない問題は errors に入れ、periods は空にする。
  */
 export function extractFromFacts(facts: readonly SourceFact[], info: DocumentInfo): ExtractionResult {
-  const companyName = info.companyName ?? '取り込んだ会社'
+  const companyName = info.companyName ?? UNNAMED_COMPANY_NAME
 
   const profile = chooseProfile(info, facts)
   if (typeof profile === 'string') {

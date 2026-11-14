@@ -1,32 +1,62 @@
-# React + TypeScript + Vite
+# 財務ビュー(zaimu-app)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+企業の有価証券報告書から財務数値を読み取り、成長性・収益性・安定性を分析する学習用の Web アプリです。
+「財務3表一体理解法」の考え方(貸借対照表・損益計算書・キャッシュ・フロー計算書をつなげて読む)に沿って、指標を 1 つの画面で見比べられるようにしています。
 
-Currently, two official plugins are available:
+投資や融資の判断を助言するものではありません。サンプルの会社は架空です。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## できること
 
-## React Compiler
+- 企業名・証券コード・EDINET コードで探し、EDINET から有価証券報告書を自動で取得して取り込む(ローカル専用)
+- 手元の EDINET の CSV(zip のまま)をドロップして取り込む
+- 日本基準と IFRS(連結)の書類に対応。どちらも同じ 22 項目にそろえて分析する
+- 概要・成長性・収益性・安定性の 4 つのページ。目安のある 14 指標を、一般的な基準に照らして判定する
+- 取り込んだ企業を一覧に積み上げる。同じ企業の別年度は、期をまとめる
+- スマホ・タブレット・PC の画面幅に対応(デジタル庁デザインシステムのトークンを使用)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 使い方
 
-## Expanding the Oxlint configuration
+Node.js 20.3 以上が必要です。
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+ブラウザで表示されたアドレスを開きます。EDINET からの自動取得を使わない場合は、これだけで動きます(手元のファイルの取り込みと、練習用データが使えます)。
+
+### EDINET から自動で取得する(任意)
+
+1. EDINET の閲覧サイトで API キーを発行します。
+2. `.env.example` を `.env` にコピーし、`EDINET_API_KEY=` のあとにキーを書きます。`.env` は git に入りません。
+3. `npm run dev` を起こし直します。
+
+仕組みと安全のための決まり、制限は [docs/edinet-local-fetch.md](docs/edinet-local-fetch.md) にあります。
+
+### そのほかのコマンド
+
+```bash
+npm test          # テスト(vitest)
+npm run lint      # oxlint
+npm run build     # 本番用ビルド
+```
+
+## 作り
+
+- 画面: React 19 + TypeScript + Vite + Tailwind CSS + Recharts
+- 計算と読み取り(`src/domain`): 画面に依存しない純粋な関数。元のデータを書き換えない
+  - `import/`: EDINET の CSV → 22 項目(日本基準・IFRS)
+  - `metrics.ts` ほか: 指標の計算と判定
+- 取り込み(`src/lib/import`): zip の展開(展開後の大きさに上限あり)と文字コードの判別
+- 中継(`server/edinet`): EDINET API を呼ぶ小さな中継。開発サーバーの中だけで動く
+
+## 安全面の考え方
+
+- 読み取りはすべてブラウザの中で行い、ファイルや数字を外部に送りません。取り込んだ企業は、このブラウザの localStorage にだけ保存されます。
+- EDINET の API キーは、中継(開発サーバー)だけが持ちます。画面のコードやビルド結果には入りません。
+- 中継は、この PC 自身からの、同じオリジンの画面だけを受け付けます。開発サーバーをトンネルなどで外に公開しないでください。
+- 外から読んだ値(ファイル・localStorage)は、形・長さ・大きさを検証してから使います。
+
+## 出典
+
+EDINET(金融庁)。公共データ利用規約(PDL1.0)に基づき、このアプリで読み取り・計算・加工して表示しています(原文のままではありません)。

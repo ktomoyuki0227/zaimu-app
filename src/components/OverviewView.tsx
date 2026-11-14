@@ -43,7 +43,7 @@ function AxisCard({ axis, onOpen }: { readonly axis: AxisSummary; readonly onOpe
       <button
         type="button"
         onClick={() => onOpen(axis.key)}
-        className="mt-3 w-fit text-left font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000"
+        className="mt-1 min-h-11 w-fit text-left font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000"
       >
         {axis.label}をくわしく見る →
       </button>
@@ -98,7 +98,7 @@ function ConcernRow({ concern, onOpen }: { readonly concern: Concern; readonly o
       <button
         type="button"
         onClick={() => onOpen(tab)}
-        className="font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000"
+        className="min-h-11 font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000"
       >
         {tab === 'profitability' ? '収益性' : '安定性'}で見る
       </button>

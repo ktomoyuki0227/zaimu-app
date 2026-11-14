@@ -3,7 +3,12 @@
  * EDINET の API キーは中継だけが持ち、ここには渡らない。通信先は同じオリジンだけ(CSP の connect-src 'self' のまま)。
  */
 
+import { cleanText } from '../../domain/import/text'
+import { DEFAULT_IMPORT_LIMITS, MAX_TEXT_LENGTH } from '../../domain/limits'
+
 const BASE = '/local-api/edinet'
+/** 中継が返す、利用者に見せる文章の長さの上限 */
+const MAX_MESSAGE_LENGTH = 300
 /** 中継は、この名前のヘッダが付いた要求だけを受け付ける(他のサイトの単純な GET と区別するため) */
 const HEADERS = { 'x-local-api': '1' } as const
 
@@ -81,17 +86,21 @@ export async function fetchStatus(signal?: AbortSignal): Promise<LocalApiStatus>
 function parseFiscalYearEnd(value: unknown): FiscalYearEnd | null {
   if (!isRecord(value)) return null
   const { month, day } = value
-  if (typeof month !== 'number' || !(typeof day === 'number' || day === 'end')) return null
-  return { month, day }
+  if (typeof month !== 'number' || !Number.isInteger(month) || month < 1 || month > 12) return null
+  if (day === 'end') return { month, day }
+  return typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= 31 ? { month, day } : null
 }
 
 function parseCompany(value: unknown): CompanyHit | null {
   if (!isRecord(value)) return null
   const { edinetCode, name, secCode, listed } = value
   if (typeof edinetCode !== 'string' || typeof name !== 'string' || typeof listed !== 'boolean') return null
+  // 画面に出す文字列は、制御文字・表示を偽装する文字を取り除く(中継の応答も、入力として疑う)
+  const cleanName = cleanText(name, MAX_TEXT_LENGTH)
+  if (cleanName === null) return null
   return {
     edinetCode,
-    name,
+    name: cleanName,
     secCode: typeof secCode === 'string' ? secCode : null,
     fiscalYearEnd: parseFiscalYearEnd(value.fiscalYearEnd),
     listed,
@@ -100,7 +109,7 @@ function parseCompany(value: unknown): CompanyHit | null {
 
 /** 中継が返したエラーの文章。無ければ、既定の文章 */
 function errorMessage(body: unknown, fallback: string): string {
-  return isRecord(body) && typeof body.error === 'string' ? body.error : fallback
+  return (isRecord(body) && typeof body.error === 'string' ? cleanText(body.error, MAX_MESSAGE_LENGTH) : null) ?? fallback
 }
 
 /** 企業名・証券コード・EDINET コードで、提出者を探す */
@@ -164,7 +173,7 @@ export function parseReportEvent(line: string): ReportEvent | null {
     }
   }
   if (value.type === 'error' && typeof value.message === 'string') {
-    return { type: 'error', message: value.message }
+    return { type: 'error', message: cleanText(value.message, MAX_MESSAGE_LENGTH) ?? '書類を探せませんでした。' }
   }
   return null
 }
@@ -221,5 +230,10 @@ export async function streamReports(
 export async function fetchDocument(docID: string, signal?: AbortSignal): Promise<Uint8Array> {
   const response = await fetch(`${BASE}/document/${encodeURIComponent(docID)}`, { headers: HEADERS, signal })
   if (!response.ok) throw new Error(errorMessage(await readJson(response), '書類を取得できませんでした。'))
+  // 読み込む前に大きさを確かめる(取り込みの上限を超える応答で、メモリを使い切らない)
+  const declared = Number(response.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declared) && declared > DEFAULT_IMPORT_LIMITS.maxFileBytes) {
+    throw new Error('書類が大きすぎるため、取り込めません。')
+  }
   return new Uint8Array(await response.arrayBuffer())
 }

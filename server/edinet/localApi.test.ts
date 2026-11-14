@@ -228,11 +228,19 @@ describe('ローカル API: reports / document', () => {
     expect(text).not.toContain(KEY)
   })
 
-  test('document は、zip のバイト列を返す', async () => {
+  test('document は、探索で見つかった書類の zip のバイト列を返す', async () => {
     const port = await start()
+    await (await get(port, '/local-api/edinet/reports?edinetCode=E90001&years=1')).text()
     const res = await get(port, '/local-api/edinet/document/S100AAAA')
     expect(res.headers.get('content-type')).toBe('application/octet-stream')
     expect(Array.from(new Uint8Array(await res.arrayBuffer()))).toEqual([0x50, 0x4b, 3, 4, 1, 2])
+  })
+
+  test('document: 探索で見つかっていない書類管理番号は、書式が正しくても 404(任意の書類を取らせない)', async () => {
+    const port = await start()
+    const res = await get(port, '/local-api/edinet/document/S100ZZZZ')
+    expect(res.status).toBe(404)
+    expect(((await res.json()) as { error: string }).error).toContain('先に')
   })
 
   test('document: 書類管理番号の書式でないものは 400(パスをたどらせない)', async () => {
@@ -244,6 +252,28 @@ describe('ローカル API: reports / document', () => {
   test('存在しない経路は 404', async () => {
     const port = await start()
     expect((await get(port, '/local-api/edinet/unknown')).status).toBe(404)
+  })
+})
+
+describe('ローカル API: Origin・Referer の検査', () => {
+  const SAME = { 'x-local-api': '1', 'sec-fetch-site': 'same-origin' }
+
+  test('Sec-Fetch-Site が same-origin でも、Origin のホストが違えば断る(別のホストのページ)', async () => {
+    const port = await start()
+    const res = await get(port, '/local-api/edinet/status', { ...SAME, origin: 'https://abc.example.net' })
+    expect(res.status).toBe(403)
+  })
+
+  test('Referer のホストが違えば断る(ヘッダを足さずに TCP を転送する中継を通った、外のブラウザ)', async () => {
+    const port = await start()
+    const res = await get(port, '/local-api/edinet/status', { ...SAME, referer: 'https://abc.example.net/' })
+    expect(res.status).toBe(403)
+  })
+
+  test('Referer が自分のホストなら通す(自前の画面からの呼び出し)', async () => {
+    const port = await start()
+    const res = await get(port, '/local-api/edinet/status', { ...SAME, referer: `http://127.0.0.1:${port}/` })
+    expect(res.status).toBe(200)
   })
 })
 

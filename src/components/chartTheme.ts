@@ -23,3 +23,21 @@ export const LINE_DASH: Record<string, string | undefined> = {
   ordinaryProfit: '8 4',
   netIncome: '2 4',
 }
+
+/** 数字 1 文字の幅(px)の目安。AXIS_TICK の文字の大きさ(14px)に合わせている */
+const TICK_CHAR_PX = 8.5
+const Y_AXIS_MIN_PX = 48
+const Y_AXIS_MAX_PX = 120
+
+/**
+ * 縦軸の数字が切れないように、軸の幅(px)を、いちばん長い数字から決める。
+ * 目盛りは「きりの良い数」に切り上がり、桁が 1 つ増えることがあるので、1 文字分の余裕を足す。
+ */
+export function yAxisWidth(values: readonly number[], format: (value: number) => string): number {
+  const longest = Math.max(
+    0,
+    ...values.flatMap((v) => (Number.isFinite(v) ? [format(v).length] : [])),
+  )
+  const width = Math.ceil((longest + 1) * TICK_CHAR_PX) + 8
+  return Math.min(Y_AXIS_MAX_PX, Math.max(Y_AXIS_MIN_PX, width))
+}

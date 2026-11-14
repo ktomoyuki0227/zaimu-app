@@ -172,6 +172,19 @@ export function useImport(onApply: ApplyImport, enabled: boolean) {
     }
   }, [])
 
+  // 取り込みのページ以外でも、ファイルをドロップしたとき、ブラウザがそのファイルを開いて、画面から離れてしまわないようにする
+  useEffect(() => {
+    const keepPage = (e: DragEvent): void => {
+      if (isFileDrag(e)) e.preventDefault()
+    }
+    window.addEventListener('dragover', keepPage)
+    window.addEventListener('drop', keepPage)
+    return () => {
+      window.removeEventListener('dragover', keepPage)
+      window.removeEventListener('drop', keepPage)
+    }
+  }, [])
+
   // 画面のどこにドロップしても読み込める(取り込みのページにいるときだけ)
   useEffect(() => {
     if (!enabled) {

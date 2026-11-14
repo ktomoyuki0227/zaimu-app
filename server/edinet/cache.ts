@@ -28,7 +28,7 @@ const RENAME_RETRIES = 5
 const RENAME_RETRY_DELAY_MS = 20
 
 /** 同じ名前への置き換えが重なったとき(Windows では EPERM・EBUSY になる)は、少し待って、やり直す */
-async function renameWithRetry(from: string, to: string): Promise<void> {
+export async function renameWithRetry(from: string, to: string): Promise<void> {
   for (let attempt = 0; ; attempt += 1) {
     try {
       await rename(from, to)

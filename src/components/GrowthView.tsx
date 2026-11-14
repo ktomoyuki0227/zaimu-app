@@ -1,24 +1,12 @@
 import { useId, useMemo, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { buildGrowthSeries, commonSizePl, profitBridge } from '../domain/growth'
 import { growthInsights } from '../domain/insights'
 import { deriveStatements } from '../domain/statements'
 import type { Company } from '../domain/types'
 import { buildWaterfall, plStaircase } from '../domain/waterfall'
-import { formatAmount, formatSignedPercent, shortPeriodLabel } from '../lib/format'
-import { AXIS_TICK, GRID_STROKE, LINE_DASH, SERIES, ZERO_LINE_STROKE } from './chartTheme'
+import { formatAmount } from '../lib/format'
+import { yAxisWidth } from './chartTheme'
+import { CompositionChart, GrowthRateChart, ProfitTrendChart, SalesTrendChart } from './GrowthCharts'
 import { Panel, Section } from './ui'
 import { WaterfallChart } from './WaterfallChart'
 
@@ -50,6 +38,14 @@ export function GrowthView({ company }: Props) {
         }
       }),
     [periods],
+  )
+  const amountAxisWidth = useMemo(
+    () =>
+      yAxisWidth(
+        trend.flatMap((t) => [t.sales, t.grossProfit, t.operatingProfit, t.ordinaryProfit, t.netIncome]),
+        formatAmount,
+      ),
+    [trend],
   )
   const growth = useMemo(() => buildGrowthSeries(periods), [periods])
   const composition = useMemo(
@@ -133,15 +129,7 @@ export function GrowthView({ company }: Props) {
       <div className="mt-12 grid grid-cols-1 gap-x-6 lg:grid-cols-2 [&>section]:mt-12 lg:[&>section]:mt-0">
         <Section title="売上高の推移" lead="年ごとの売上高です。">
           <Panel>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={trend} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-                <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-                <YAxis tick={AXIS_TICK} width={64} tickFormatter={(v: number) => formatAmount(v)} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatAmount(v) : String(v))} />
-                <Bar dataKey="sales" name={SERIES.sales.label} fill={SERIES.sales.color} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
+            <SalesTrendChart trend={trend} axisWidth={amountAxisWidth} />
           </Panel>
         </Section>
 
@@ -150,43 +138,7 @@ export function GrowthView({ company }: Props) {
           lead="営業・経常・当期純利益です。売上が伸びているのに線が寝ている期は、儲けにくくなっているサインです。"
         >
           <Panel>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trend} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-                <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-                <YAxis tick={AXIS_TICK} width={64} tickFormatter={(v: number) => formatAmount(v)} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatAmount(v) : String(v))} />
-                <Legend />
-                <ReferenceLine y={0} stroke={ZERO_LINE_STROKE} />
-                <Line
-                  dataKey="operatingProfit"
-                  name={SERIES.operatingProfit.label}
-                  stroke={SERIES.operatingProfit.color}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  strokeDasharray={LINE_DASH.operatingProfit}
-                  isAnimationActive={false}
-                />
-                <Line
-                  dataKey="ordinaryProfit"
-                  name={SERIES.ordinaryProfit.label}
-                  stroke={SERIES.ordinaryProfit.color}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  strokeDasharray={LINE_DASH.ordinaryProfit}
-                  isAnimationActive={false}
-                />
-                <Line
-                  dataKey="netIncome"
-                  name={SERIES.netIncome.label}
-                  stroke={SERIES.netIncome.color}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  strokeDasharray={LINE_DASH.netIncome}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <ProfitTrendChart trend={trend} axisWidth={amountAxisWidth} />
           </Panel>
         </Section>
       </div>
@@ -214,139 +166,27 @@ export function GrowthView({ company }: Props) {
       </Section>
 
       <details className="mt-12">
-        <summary className="cursor-pointer text-[1.125rem] font-bold text-blue-900 underline underline-offset-4">
+        <summary className="min-h-11 cursor-pointer py-2 text-[1.125rem] font-bold text-blue-900 underline underline-offset-4">
           さらに詳しく見る(前期比の増減率・売上高に対する中身)
         </summary>
         <div className="mt-6">
-        <Section
-        title="前期比の増減率"
-        lead="金額の大小に関係なく、伸び方だけを同じ物差しで比べます。営業利益の線が売上高の線より上にあれば、売上の伸び以上に利益が増えています。"
-      >
-        <Panel>
-          <ResponsiveContainer width="100%" height={340}>
-            <LineChart data={[...growth]} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-              <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-              <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-              <YAxis
-                tick={AXIS_TICK}
-                width={64}
-                tickFormatter={(v: number) => `${v}%`}
-              />
-              <Tooltip
-                formatter={(v) => (typeof v === 'number' ? formatSignedPercent(v) : String(v))}
-              />
-              <Legend />
-              <ReferenceLine y={0} stroke={ZERO_LINE_STROKE} />
-              <Line
-                dataKey="sales"
-                name={SERIES.sales.label}
-                stroke={SERIES.sales.color}
-                strokeWidth={3}
-                isAnimationActive={false}
-              />
-              <Line
-                dataKey="operatingProfit"
-                name={SERIES.operatingProfit.label}
-                stroke={SERIES.operatingProfit.color}
-                strokeWidth={3}
-                isAnimationActive={false}
-              />
-              <Line
-                dataKey="ordinaryProfit"
-                name={SERIES.ordinaryProfit.label}
-                stroke={SERIES.ordinaryProfit.color}
-                strokeWidth={3}
-                strokeDasharray={LINE_DASH.ordinaryProfit}
-                isAnimationActive={false}
-              />
-              <Line
-                dataKey="netIncome"
-                name={SERIES.netIncome.label}
-                stroke={SERIES.netIncome.color}
-                strokeWidth={3}
-                strokeDasharray={LINE_DASH.netIncome}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <Section
+            title="前期比の増減率"
+            lead="金額の大小に関係なく、伸び方だけを同じ物差しで比べます。営業利益の線が売上高の線より上にあれば、売上の伸び以上に利益が増えています。"
+          >
+            <Panel>
+              <GrowthRateChart growth={growth} />
+            </Panel>
+          </Section>
 
-          <details className="mt-4">
-            <summary className="cursor-pointer font-bold text-blue-900 underline underline-offset-4">
-              数値を表で見る
-            </summary>
-            <div className="relative mt-3 overflow-x-auto">
-              <table className="tnum w-full min-w-[32rem] border-collapse text-right">
-                <caption className="sr-only">売上高と各利益の前期比(%)の表</caption>
-                <thead>
-                  <tr className="border-b-2 border-solid-gray-900">
-                    <th scope="col" className="py-2 pr-4 text-left">
-                      期
-                    </th>
-                    <th scope="col" className="px-3 py-2">売上高</th>
-                    <th scope="col" className="px-3 py-2">営業利益</th>
-                    <th scope="col" className="px-3 py-2">経常利益</th>
-                    <th scope="col" className="px-3 py-2">当期純利益</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {growth.map((g, i) => (
-                    <tr key={`${g.label}-${i}`} className="border-b border-solid-gray-200">
-                      <th scope="row" className="py-2 pr-4 text-left font-normal">
-                        {g.label}
-                      </th>
-                      <td className="px-3 py-2">{formatSignedPercent(g.sales)}</td>
-                      <td className="px-3 py-2">{formatSignedPercent(g.operatingProfit)}</td>
-                      <td className="px-3 py-2">{formatSignedPercent(g.ordinaryProfit)}</td>
-                      <td className="px-3 py-2">{formatSignedPercent(g.netIncome)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        </Panel>
-      </Section>
-
-        <Section
-        title="売上高を 100% としたときの中身"
-        lead="売上 100 のうち、原価・販管費に何%使い、営業利益が何%残ったかを期ごとに並べます。黒い点線が売上高の 100% で、棒がこの線を超えている期は営業赤字です。"
-      >
-        <Panel>
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={composition} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-              <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-              <XAxis dataKey="label" tick={AXIS_TICK} tickFormatter={shortPeriodLabel} />
-              <YAxis tick={AXIS_TICK} width={64} tickFormatter={(v: number) => `${v}%`} />
-              <Tooltip
-                formatter={(v) => (typeof v === 'number' ? `${v.toFixed(1)}%` : String(v))}
-              />
-              <Legend />
-              <ReferenceLine y={100} stroke={ZERO_LINE_STROKE} strokeDasharray="6 4" />
-              <Bar
-                dataKey="costOfSales"
-                name="売上原価"
-                stackId="pl"
-                fill="var(--color-solid-gray-300)"
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="sga"
-                name="販管費"
-                stackId="pl"
-                fill="var(--color-solid-gray-500)"
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="operatingProfit"
-                name="営業利益"
-                stackId="pl"
-                fill={SERIES.operatingProfit.color}
-                isAnimationActive={false}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
-      </Section>
+          <Section
+            title="売上高を 100% としたときの中身"
+            lead="売上 100 のうち、原価・販管費に何%使い、営業利益が何%残ったかを期ごとに並べます。黒い点線が売上高の 100% で、棒がこの線を超えている期は営業赤字です。"
+          >
+            <Panel>
+              <CompositionChart composition={composition} />
+            </Panel>
+          </Section>
         </div>
       </details>
     </div>

@@ -1,3 +1,4 @@
+import { UNNAMED_COMPANY_NAME } from '../../domain/import/extract'
 import { toCompany } from '../../domain/import/toCompany'
 import type { ExtractionResult } from '../../domain/import/types'
 import { DEFAULT_IMPORT_LIMITS, type ImportLimits } from '../../domain/limits'
@@ -15,6 +16,17 @@ export type RunOutcome =
   | { readonly kind: 'error'; readonly message: string }
 
 /**
+ * 企業の識別。EDINET コードも会社名も読めなかった書類は、見つからなかったときの仮の名前が同じになるので、
+ * 無関係な書類どうしが 1 つの企業に混ざらないよう、そのつど別の識別にする。
+ */
+function identityOf(edinetCode: string | null, name: string): string {
+  if (edinetCode === null && name === UNNAMED_COMPANY_NAME) {
+    return `unnamed-${globalThis.crypto.randomUUID()}`
+  }
+  return companyIdFor(edinetCode, name)
+}
+
+/**
  * ファイルの中身(バイト列)から、抽出結果と(反映できるなら)Company を返す。
  * EDINET から取得した書類も、手元から選んだファイルも、同じ処理を通す。
  */
@@ -26,7 +38,7 @@ export function runImportBytes(bytes: Uint8Array, limits: ImportLimits = DEFAULT
   if (outcome.result.errors.length > 0) {
     return { kind: 'ready', result: outcome.result, company: null }
   }
-  const company = toCompany(outcome.result, companyIdFor(outcome.result.edinetCode, outcome.result.companyName))
+  const company = toCompany(outcome.result, identityOf(outcome.result.edinetCode, outcome.result.companyName))
   if (company === null) {
     return {
       kind: 'error',

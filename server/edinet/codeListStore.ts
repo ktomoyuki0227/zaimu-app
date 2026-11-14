@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { unzipSync } from 'fflate'
+import { readBoundedBody } from './boundedBody.ts'
+import { renameWithRetry } from './cache.ts'
 import { parseCodeListBytes, type CompanyEntry } from './codeList.ts'
 
 /** 金融庁が公開している EDINET コードリスト(API キーは不要)。接続先はここだけ */
@@ -12,6 +14,8 @@ const MAX_ZIP_BYTES = 10 * 1024 * 1024
 const MAX_CSV_BYTES = 20 * 1024 * 1024
 const DEFAULT_MAX_AGE_MS = 7 * 86_400_000
 const TIMEOUT_MS = 60_000
+/** 取り直せず古いキャッシュで間に合わせたときに、次に取り直しを試すまでの時間(7 日間は待たない) */
+const STALE_RETRY_MS = 10 * 60_000
 
 export interface CodeListStore {
   /** コードリストを読む。キャッシュが新しければそれを使い、古ければ取り直す(取れなければ古いものを使う) */
@@ -51,15 +55,16 @@ export function createCodeListStore(options: CodeListStoreOptions): CodeListStor
     if (!response.ok) throw new Error(`EDINET コードリストを取得できませんでした(HTTP ${response.status})。`)
     const declared = Number(response.headers.get('content-length') ?? '0')
     if (declared > MAX_ZIP_BYTES) throw new Error('EDINET コードリストが大きすぎます。')
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.length > MAX_ZIP_BYTES || !isZip(bytes)) {
+    const bytes = await readBoundedBody(response, MAX_ZIP_BYTES)
+    if (bytes === null) throw new Error('EDINET コードリストが大きすぎます。')
+    if (!isZip(bytes)) {
       throw new Error('EDINET コードリストの形式が想定と違います。')
     }
     await mkdir(dir, { recursive: true })
     const temp = `${zipPath}.${randomUUID()}.tmp`
     try {
       await writeFile(temp, bytes)
-      await rename(temp, zipPath)
+      await renameWithRetry(temp, zipPath)
     } catch (error) {
       await unlink(temp).catch(() => undefined)
       throw error
@@ -67,7 +72,8 @@ export function createCodeListStore(options: CodeListStoreOptions): CodeListStor
     return bytes
   }
 
-  const loadOnce = async (): Promise<readonly CompanyEntry[]> => {
+  /** stale: 取り直せず、古いキャッシュで間に合わせた */
+  const loadOnce = async (): Promise<{ readonly list: readonly CompanyEntry[]; readonly stale: boolean }> => {
     let cached: Uint8Array | null = null
     let fresh = false
     try {
@@ -87,14 +93,14 @@ export function createCodeListStore(options: CodeListStoreOptions): CodeListStor
     }
     if (cached !== null && fresh) {
       const list = fromCache(cached)
-      if (list !== null) return list
+      if (list !== null) return { list, stale: false }
     }
     try {
-      return parse(extractCsv(await download()))
+      return { list: parse(extractCsv(await download())), stale: false }
     } catch (error) {
       // 取り直せなくても、読める古いキャッシュがあれば使う(企業名と決算日の一覧は、頻繁には変わらない)
       const list = cached === null ? null : fromCache(cached)
-      if (list !== null) return list
+      if (list !== null) return { list, stale: true }
       throw error
     }
   }
@@ -105,10 +111,17 @@ export function createCodeListStore(options: CodeListStoreOptions): CodeListStor
       if (memo !== null && now() - memoAt >= maxAgeMs) memo = null
       if (memo === null) {
         memoAt = now()
-        memo = loadOnce().catch((error: unknown) => {
-          memo = null
-          throw error
-        })
+        memo = loadOnce().then(
+          ({ list, stale }) => {
+            // 古いもので間に合わせたときは、7 日間そのままにせず、少しあとに取り直しを試す
+            if (stale) memoAt = now() - maxAgeMs + STALE_RETRY_MS
+            return list
+          },
+          (error: unknown) => {
+            memo = null
+            throw error
+          },
+        )
       }
       return memo
     },

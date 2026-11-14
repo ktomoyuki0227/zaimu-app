@@ -116,3 +116,50 @@ describe('createCodeListStore', () => {
     expect(urls).toHaveLength(2) // 8 日後は、メモもファイルも古いので、取り直す
   })
 })
+
+describe('createCodeListStore: 取り直しに失敗したとき', () => {
+  test('古いキャッシュで間に合わせたあとは、7 日間そのままにせず、少しあとに取り直しを試す', async () => {
+    // 古い(期限切れの)キャッシュを置く
+    const zipPath = join(dir, 'Edinetcode.zip')
+    await writeFile(zipPath, codeListZip())
+    const old = new Date(Date.now() - 30 * 86_400_000)
+    await utimes(zipPath, old, old)
+    let clock = Date.now()
+    let online = false
+    const { fetchImpl, urls } = countingFetch(() => {
+      if (!online) throw new Error('offline')
+      return new Response(codeListZip())
+    })
+    const store = createCodeListStore({ dir, fetchImpl, parse: parseUtf8, now: () => clock })
+    // ネットワークが落ちている間は、古いキャッシュを使う
+    expect((await store.load()).length).toBe(1)
+    expect(urls).toHaveLength(1)
+    // すぐ後はそのまま(取りに行かない)
+    await store.load()
+    expect(urls).toHaveLength(1)
+    // 10 分あまり後は、ネットワークが戻っていれば取り直す
+    online = true
+    clock += 11 * 60_000
+    await store.load()
+    expect(urls).toHaveLength(2)
+  })
+
+  test('Content-Length を名乗らない巨大な応答は、読み切らずに断り、キャッシュも壊さない', async () => {
+    let pulled = 0
+    const { fetchImpl } = countingFetch(
+      () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              pulled += 1
+              controller.enqueue(new Uint8Array(4 * 1024 * 1024))
+              if (pulled > 100) controller.close()
+            },
+          }),
+        ),
+    )
+    const store = createCodeListStore({ dir, fetchImpl, parse: parseUtf8 })
+    await expect(store.load()).rejects.toThrow(/大きすぎ/)
+    expect(pulled).toBeLessThan(10)
+  })
+})

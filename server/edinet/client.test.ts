@@ -285,3 +285,57 @@ describe('createEdinetClient: 制限を示されたあと', () => {
     await expect(client.downloadCsvZip('S100AAAA')).rejects.toBeInstanceOf(EdinetApiError)
   })
 })
+
+describe('createEdinetClient: 中止・サイズ・エラーの境目', () => {
+  test('順番待ちの間隔の待機中に中止すると、待たずにすぐ終わる(切断後に「実行中」が残らない)', async () => {
+    const { fetchImpl } = fakeFetch(() => json({ metadata: { status: '200' }, results: [] }))
+    // 既定の待機(中止できる sleep)を使う。2 回目は、1 回目から 600ms 空けないと送れない
+    const client = createEdinetClient({ apiKey: KEY, fetchImpl, minIntervalMs: 600 })
+    await client.listDocuments('2025-06-26')
+    const abort = new AbortController()
+    const started = Date.now()
+    const second = client.listDocuments('2025-06-27', abort.signal)
+    setTimeout(() => abort.abort(), 20)
+    await expect(second).rejects.toBeDefined()
+    expect(Date.now() - started).toBeLessThan(300)
+  })
+
+  test('中止された待機のあとも、次の要求は続けられる(待ち行列が詰まらない)', async () => {
+    const { fetchImpl, calls } = fakeFetch(() => json({ metadata: { status: '200' }, results: [] }))
+    const client = createEdinetClient({ apiKey: KEY, fetchImpl, minIntervalMs: 100 })
+    await client.listDocuments('2025-06-26')
+    const abort = new AbortController()
+    const aborted = client.listDocuments('2025-06-27', abort.signal)
+    abort.abort()
+    await expect(aborted).rejects.toBeDefined()
+    await client.listDocuments('2025-06-28')
+    expect(calls.map((c) => c.url.searchParams.get('date'))).toEqual(['2025-06-26', '2025-06-28'])
+  })
+
+  test('metadata.status が null の応答を、「ステータス 0 のエラー」にしない', async () => {
+    const { fetchImpl } = fakeFetch(() => json({ metadata: { status: null }, results: [DOC] }))
+    const client = createEdinetClient({ apiKey: KEY, fetchImpl, sleep: noSleep })
+    await expect(client.listDocuments('2025-06-27')).rejects.not.toThrow(/ステータス 0/)
+  })
+
+  test('Content-Length を名乗らない巨大な応答は、上限で読むのをやめて断る', async () => {
+    let pulled = 0
+    const { fetchImpl } = fakeFetch(
+      () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              pulled += 1
+              controller.enqueue(new Uint8Array(8 * 1024 * 1024))
+              if (pulled > 100) controller.close()
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/octet-stream' } },
+        ),
+    )
+    const client = createEdinetClient({ apiKey: KEY, fetchImpl, sleep: noSleep })
+    await expect(client.downloadCsvZip('S100AAAA')).rejects.toThrow(/大きすぎる/)
+    // 上限(30MB)を超えた時点で止まり、100 回分(800MB)を読み続けない
+    expect(pulled).toBeLessThan(10)
+  })
+})

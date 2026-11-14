@@ -26,6 +26,9 @@ const MAX_QUERY_LENGTH = 100
 const MIN_YEARS = 1
 const MAX_YEARS = 5
 
+/** 覚えておく書類管理番号の数の上限(1 回の探索で見つかるのは最大 5 年分なので、十分に大きい) */
+const MAX_KNOWN_DOC_IDS = 500
+
 const BASE_HEADERS = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',
@@ -61,6 +64,7 @@ function originHost(origin: string): string | null {
  * - Host が localhost 系(DNS リバインディングで、外のサイトからこの PC の API を呼ばせない)
  * - 中継(トンネルなど)を経由していない(Host を書き換える中継経由の、外からの要求を断る)
  * - ブラウザなら同じオリジンからの呼び出し(Sec-Fetch-Site が same-origin。無い古いブラウザでは、Origin が Host と同じ)
+ * - Origin・Referer が付いていれば、そのホストが Host と同じ(ヘッダを足さずに TCP をそのまま転送する中継経由の、外のブラウザからの要求を断る)
  * - 自前の画面だけが付けるヘッダ(他のサイトの単純な GET では付けられない)
  */
 function isAllowed(req: IncomingMessage): boolean {
@@ -73,6 +77,10 @@ function isAllowed(req: IncomingMessage): boolean {
   if (site !== undefined && site !== 'same-origin') return false
   const origin = req.headers.origin
   if (site === undefined && origin !== undefined && originHost(origin) !== host) return false
+  // Sec-Fetch-Site が same-origin でも、Origin・Referer のホストが違えば、別のホストのページからの要求
+  if (origin !== undefined && originHost(origin) !== host) return false
+  const referer = req.headers.referer
+  if (referer !== undefined && originHost(referer) !== host) return false
   return req.headers['x-local-api'] === '1'
 }
 
@@ -85,6 +93,11 @@ function parseYears(value: string | null): number | null {
 export function createLocalApiHandler(deps: LocalApiDeps) {
   /** 実行中の探索の数。探索は日付ごとに EDINET へ問い合わせるので、同時には 1 つだけ走らせる */
   let activeScans = 0
+  /**
+   * 探索で見つかった書類管理番号。/document は、ここにある番号だけダウンロードする
+   * (任意の番号を次々に要求して、API キーの利用枠とディスクを使わせない)。
+   */
+  const knownDocIds = new Set<string>()
 
   const requireService = (res: ServerResponse): ServiceDeps | null => {
     if (deps.service === null) {
@@ -144,6 +157,10 @@ export function createLocalApiHandler(deps: LocalApiDeps) {
         signal: controller.signal,
         onProgress: (p) => write({ type: 'progress', ...p }),
       })
+      for (const r of result.reports) {
+        if (knownDocIds.size >= MAX_KNOWN_DOC_IDS) knownDocIds.clear()
+        knownDocIds.add(r.docID)
+      }
       write({
         type: 'done',
         reports: result.reports.map((r) => ({
@@ -171,6 +188,10 @@ export function createLocalApiHandler(deps: LocalApiDeps) {
     if (service === null) return
     if (!DOC_ID.test(docID)) {
       sendJson(res, 400, { error: '書類管理番号の形式が正しくありません。' })
+      return
+    }
+    if (!knownDocIds.has(docID)) {
+      sendJson(res, 404, { error: 'この書類は、先に「有価証券報告書を取得する」で探したものだけ取得できます。' })
       return
     }
     try {
