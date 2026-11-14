@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# テストのカバレッジ出力と、秘密情報を入れる環境変数ファイル
+coverage
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 実ファイルでの検証用(コミットしない)
+local-fixtures
+
+# EDINET の取得結果のキャッシュ(自分の PC だけに置く)
+.cache
+
+# Claude Code のローカル設定(自分の PC だけに置く)
+.claude

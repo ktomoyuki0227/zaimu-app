@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+/* デジタル庁デザインシステムのデザイントークン(色・タイポグラフィ・角丸など) */
+@import '@digital-go-jp/tailwind-theme-plugin/v4';
+/* Noto Sans JP を自前で配信する(外部のフォント配信サービスに通信しない)。
+   使われる文字を含む分割ファイルだけがブラウザに読み込まれる。 */
+@import '@fontsource-variable/noto-sans-jp';
+
+/* デザインシステムの指定フォント(Noto Sans JP)を、自前配信のフォント名に結びつける */
+@theme {
+  --font-sans: 'Noto Sans JP Variable', 'Noto Sans JP', sans-serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-solid-gray-900);
+    background: var(--color-white);
+    /* 本文は 16px 以上、行間は 150% 以上(デザインシステムの基準) */
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--color-white);
+  }
+
+  /* フォーカスリングはデザインシステムの指定(黄色 + 黒)に合わせる */
+  :focus-visible {
+    outline: 4px solid var(--color-focus-yellow);
+    outline-offset: 2px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--color-black);
+  }
+
+  /* 表の数字は桁をそろえて読みやすくする */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
