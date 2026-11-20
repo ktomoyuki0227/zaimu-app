@@ -59,7 +59,7 @@ export interface CashBridge {
 }
 
 /** 「2025年3月期」を、年と月にする。読めなければ null */
-function yearMonth(label: string): { readonly year: number; readonly month: number } | null {
+export function yearMonth(label: string): { readonly year: number; readonly month: number } | null {
   const match = /^(\d{4})年(\d{1,2})月期$/.exec(label)
   return match === null ? null : { year: Number(match[1]), month: Number(match[2]) }
 }

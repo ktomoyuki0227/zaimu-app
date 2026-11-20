@@ -45,6 +45,11 @@ export function formatSignedAmount(value: number): string {
   return value > 0 && text !== '0' ? `+${text}` : text
 }
 
+/** 符号つきの数字(「+1,000」「-500」)。数字が無いときは「—」 */
+export function formatSignedOrDash(value: number | null): string {
+  return value === null ? '—' : formatSignedAmount(value)
+}
+
 const PERIOD_LABEL = /^(\d{4})年(\d{1,2})月期$/
 
 /** 横軸に並べる短い期の名前。「2025年3月期」→「2025/3」。読めない名前はそのまま */

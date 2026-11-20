@@ -1,15 +1,33 @@
 import { useMemo } from 'react'
 import { METRIC_CATALOG, getMetricDefinition, unavailableText, type EvaluationLevel } from '../domain/catalog'
+import {
+  CONVERSION_CAUTION,
+  bridgeNote,
+  cashConversionNote,
+  cashFlowHighlights,
+  freeCashFlowNote,
+  streakNote,
+  type CashFlowHighlights,
+} from '../domain/cashFlowHighlights'
+import { CASH_FLOW_KINDS, cashFlowValue } from '../domain/cashFlow'
 import { growthRate } from '../domain/growth'
 import { growthInsights } from '../domain/insights'
 import { summarize, type AxisSummary, type Concern, type Kpi } from '../domain/overview'
 import type { Company } from '../domain/types'
-import { companyLabel, formatAmount, formatChange, formatMetric, formatSignedPercent } from '../lib/format'
+import {
+  companyLabel,
+  formatAmount,
+  formatChange,
+  formatMetric,
+  formatSignedOrDash as signed,
+  formatSignedPercent,
+} from '../lib/format'
 import { gapText } from '../lib/gap'
+import { SignBadge } from './CashFlowParts'
 import { AXIS_VERDICT_LABEL, LEVEL_STYLE } from './levelStyle'
 import { LevelBadge, Panel, Section } from './ui'
 
-export type DetailTab = 'growth' | 'profitability' | 'stability'
+export type DetailTab = 'growth' | 'profitability' | 'stability' | 'cashflow'
 
 const AXIS_BORDER: Record<EvaluationLevel, string> = {
   good: 'border-green-800',
@@ -82,6 +100,95 @@ function KpiTile({ kpi }: { readonly kpi: Kpi }) {
   )
 }
 
+/** キャッシュフローの要点の、文章の行(型・続き方・利益との関係・現金の突き合わせ) */
+function highlightLines(h: CashFlowHighlights): readonly { readonly key: string; readonly text: string; readonly caution: boolean }[] {
+  const { pattern } = h.summary
+  const lines: { key: string; text: string; caution: boolean }[] = []
+  if (pattern !== null) {
+    lines.push({
+      key: 'pattern',
+      text: `お金の流れの型: ${pattern.title}。${pattern.note ?? pattern.meaning}`,
+      caution: pattern.caution || pattern.note !== null,
+    })
+  }
+  if (h.streak !== null) lines.push({ key: 'streak', text: streakNote(h.streak), caution: h.streak.sign === 'minus' })
+  if (h.cashConversion !== null) {
+    lines.push({
+      key: 'conversion',
+      text: cashConversionNote(h.cashConversion),
+      caution: h.cashConversion < CONVERSION_CAUTION,
+    })
+  }
+  const bridge = bridgeNote(h.bridge)
+  if (bridge !== null) lines.push({ key: 'bridge', text: bridge, caution: h.bridge !== null && !h.bridge.matches })
+  return lines
+}
+
+/** 概要ページのキャッシュフローの要点。3 区分の符号と数字・フリーキャッシュフロー・読み取れること */
+function CashFlowHighlightsSection({
+  highlights,
+  unit,
+  onOpen,
+}: {
+  readonly highlights: CashFlowHighlights
+  readonly unit: string | undefined
+  readonly onOpen: (tab: DetailTab) => void
+}) {
+  const { summary } = highlights
+  return (
+    <Section
+      title={`キャッシュフローの要点(${highlights.label})`}
+      lead={`お金の出入りを、営業 → 投資 → 財務の順に、プラス(資金が入った)とマイナス(資金が出た)で見ます。${highlights.basisNote ?? ''}`}
+    >
+      <ol className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-3">
+        {CASH_FLOW_KINDS.map((kind, i) => {
+          const value = cashFlowValue(summary, kind.key)
+          return (
+            <li key={kind.key} className="rounded-8 border border-solid-gray-420 bg-white p-4">
+              <p className="text-solid-gray-800">
+                {i + 1}. {kind.label}
+              </p>
+              <p className="tnum mt-1 text-[2rem] font-bold leading-tight text-solid-gray-900">
+                {signed(value)}
+                {value === null ? null : (
+                  <span className="ml-1 text-base font-normal text-solid-gray-700">{unit ?? '(単位不明)'}</span>
+                )}
+              </p>
+              <div className="mt-2">
+                <SignBadge value={value} />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+      <div className="mt-4 rounded-8 border-l-8 border-blue-900 bg-blue-50 p-4 sm:p-5">
+        {summary.free === null ? null : (
+          <p className="tnum font-bold text-solid-gray-900">
+            フリーキャッシュフロー(営業 + 投資): {signed(summary.free)}
+            {unit === undefined ? '' : ` ${unit}`}
+            <span className="ml-2 font-normal text-solid-gray-800">{freeCashFlowNote(summary)}</span>
+          </p>
+        )}
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-solid-gray-900">
+          {highlightLines(highlights).map((line) => (
+            <li key={line.key}>
+              {line.caution ? <span className="font-bold">注意: </span> : null}
+              {line.text}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button
+        type="button"
+        onClick={() => onOpen('cashflow')}
+        className="mt-1 min-h-11 font-bold text-blue-900 underline underline-offset-4 hover:text-blue-1000"
+      >
+        キャッシュフローをくわしく見る →
+      </button>
+    </Section>
+  )
+}
+
 /** 気をつけたい指標が、どのタブにあるか */
 function tabOf(concern: Concern): DetailTab {
   return getMetricDefinition(concern.key).group
@@ -120,6 +227,7 @@ export function OverviewView({ company, onOpen }: Props) {
     const periods = company.periods
     return periods.length > 1 ? growthInsights(periods[periods.length - 2], periods[periods.length - 1]) : []
   }, [company.periods])
+  const cashFlow = useMemo(() => cashFlowHighlights(company.periods), [company.periods])
   const metricCount = METRIC_CATALOG.filter((d) => d.guideline !== undefined).length
 
   return (
@@ -142,6 +250,10 @@ export function OverviewView({ company, onOpen }: Props) {
           ))}
         </ul>
       </Section>
+
+      {cashFlow === null ? null : (
+        <CashFlowHighlightsSection highlights={cashFlow} unit={company.unit} onOpen={onOpen} />
+      )}
 
       <Section
         title="気をつけたい点"
