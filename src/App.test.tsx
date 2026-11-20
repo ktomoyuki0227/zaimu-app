@@ -90,6 +90,42 @@ describe('App: 練習用データと一覧', () => {
   })
 })
 
+describe('App: 他社比較', () => {
+  const two = (): Company[] => [
+    { ...SAMPLE_COMPANY, id: 'c1', name: '甲社' },
+    { ...SAMPLE_COMPANY, id: 'c2', name: '乙社' },
+  ]
+
+  test('企業が 1 社だけのときは、比較のボタンを出さない', () => {
+    store([SAMPLE_COMPANY])
+    render(<App />)
+    expect(screen.queryByRole('button', { name: /他社比較/ })).toBeNull()
+  })
+
+  test('2 社以上あれば、ボタンから比較のページへ移り、「企業の一覧へ」で戻る', async () => {
+    store(two())
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '企業を比べる(他社比較)' }))
+    expect(await screen.findByRole('heading', { level: 1, name: '他社比較' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: '財務ビュー' })).toBeNull()
+    expect(screen.getAllByRole('table').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '← 企業の一覧へ' }))
+    expect(await screen.findByRole('heading', { level: 2, name: /取り込んだ企業/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: '他社比較' })).toBeNull()
+  })
+
+  test('比較のページから企業の分析を開くと、その企業のページに移る。そこから一覧へ戻ると、比較ではなく一覧になる', async () => {
+    store(two())
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '企業を比べる(他社比較)' }))
+    fireEvent.click(await screen.findByRole('button', { name: '乙社の分析を見る →' }))
+    expect(await screen.findByRole('heading', { level: 1, name: '乙社' })).toBeTruthy()
+    fireEvent.click(screen.getByText('← 企業の一覧へ'))
+    expect(await screen.findByRole('heading', { level: 2, name: /取り込んだ企業/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: '他社比較' })).toBeNull()
+  })
+})
+
 describe('App: ファイルの取り込みと取り消し', () => {
   test('確認の要らないファイルは、そのまま反映して分析ページに移り、「元に戻す」で取り消せる', async () => {
     render(<App />)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppFooter } from './components/AppFooter'
 import { CashFlowView } from './components/CashFlowView'
 import { CompanyHeader, type TabId } from './components/CompanyHeader'
+import { CompareView } from './components/CompareView'
 import { GrowthView } from './components/GrowthView'
 import { HomeView } from './components/HomeView'
 import { ImportBanner, type ImportNotice } from './components/ImportBanner'
@@ -32,6 +33,8 @@ export default function App() {
   // null のとき、取り込みのページ(企業の一覧)を出す。選ぶと分析のページに移る
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tab, setTab] = useState<TabId>('overview')
+  // true のとき、他社比較のページを出す(企業を選んでいないとき)
+  const [comparing, setComparing] = useState(false)
 
   const [importNotice, setImportNotice] = useState<ImportNotice | null>(null)
   const [beforeImport, setBeforeImport] = useState<Snapshot | null>(null)
@@ -54,6 +57,7 @@ export default function App() {
   const undoable = beforeImport !== null && beforeImport.externalVersion === store.externalVersion
 
   const openCompany = (id: string, nextTab: TabId = 'overview'): void => {
+    setComparing(false)
     setSelectedId(id)
     setTab(nextTab)
     setStatusMessage(null)
@@ -64,6 +68,19 @@ export default function App() {
   const openTab = (next: TabId): void => {
     setTab(next)
     window.scrollTo({ top: 0 })
+  }
+
+  const openCompare = (): void => {
+    setComparing(true)
+    setStatusMessage(null)
+    window.scrollTo({ top: 0 })
+    focusMain()
+  }
+
+  const closeCompare = (): void => {
+    setComparing(false)
+    window.scrollTo({ top: 0 })
+    focusMain()
   }
 
   const backToList = (): void => {
@@ -105,7 +122,8 @@ export default function App() {
     return true
   }
 
-  const importer = useImport(applyImports, selectedId === null)
+  // ドロップ・貼り付けでの取り込みは、取り込みの結果(エラー・確認)を出せる最初のページ(企業の一覧)でだけ受け付ける
+  const importer = useImport(applyImports, selectedId === null && !comparing)
 
   const undoImport = (): void => {
     if (beforeImport !== null) {
@@ -173,13 +191,17 @@ export default function App() {
           ) : null}
         </div>
 
-        {company === null ? (
+        {company === null && comparing ? (
+          <CompareView companies={companies} onBack={closeCompare} onOpenCompany={(id) => openCompany(id)} />
+        ) : null}
+        {company === null && !comparing ? (
           <HomeView
             companies={companies}
             importer={importer}
             onOpenCompany={(id) => openCompany(id)}
             onRemoveCompany={deleteCompany}
             onAddSample={addSample}
+            onCompare={openCompare}
             relay={relay}
             onRelayKnown={setRelay}
           />

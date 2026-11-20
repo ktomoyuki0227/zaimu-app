@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { MIN_COMPARE } from '../domain/compare'
 import { MAX_COMPANIES } from '../domain/portfolio'
 import { summarize } from '../domain/overview'
 import type { Company } from '../domain/types'
@@ -7,7 +8,7 @@ import { companyLabel } from '../lib/format'
 import { AXIS_VERDICT_LABEL, LEVEL_STYLE } from './levelStyle'
 import { EdinetFetchPanel } from './EdinetFetchPanel'
 import { ImportStatus } from './ImportStatus'
-import { BUTTON_PRIMARY, LINK } from './styles'
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, LINK } from './styles'
 import type { ImportController } from './useImport'
 
 
@@ -76,6 +77,8 @@ interface Props {
   readonly onOpenCompany: (id: string) => void
   readonly onRemoveCompany: (id: string) => void
   readonly onAddSample: () => void
+  /** 他社比較のページを開く(企業が 2 社以上あるときだけ、ボタンを出す) */
+  readonly onCompare: () => void
   /** EDINET からの自動取得が使えるか(null: まだ分からない) */
   readonly relay: LocalApiStatus['kind'] | null
   readonly onRelayKnown: (kind: LocalApiStatus['kind']) => void
@@ -93,6 +96,7 @@ export function HomeView({
   onOpenCompany,
   onRemoveCompany,
   onAddSample,
+  onCompare,
   relay,
   onRelayKnown,
 }: Props) {
@@ -150,6 +154,13 @@ export function HomeView({
             ({companies.length} / {MAX_COMPANIES} 社)
           </span>
         </h2>
+        {companies.length >= MIN_COMPARE ? (
+          <p className="mt-3">
+            <button type="button" onClick={onCompare} className={BUTTON_SECONDARY}>
+              企業を比べる(他社比較)
+            </button>
+          </p>
+        ) : null}
         {companies.length === 0 ? (
           <p className="mt-3 text-solid-gray-800">
             {relay === 'unavailable'
