@@ -9,8 +9,10 @@ import {
   summarizeCashFlow,
   type CashFlowSummary,
 } from '../domain/cashFlow'
+import { cashCheckStatus, reconcileCash, type CashBridge } from '../domain/cashReconciliation'
 import type { Company } from '../domain/types'
-import { amountUnitText, formatSignedAmount } from '../lib/format'
+import { amountUnitText, formatAmount, formatSignedAmount } from '../lib/format'
+import { CashBridgeView } from './CashBridge'
 import { CashFlowChart } from './CashFlowCharts'
 import { Panel, Section, UnitNote } from './ui'
 
@@ -84,21 +86,33 @@ function PeriodCards({ summary, unit }: { readonly summary: CashFlowSummary; rea
   )
 }
 
-/** 期ごとの比較表(行: 営業・投資・財務・フリー・合計、列: 期) */
+/** 突き合わせの結果の、表に出す短い言葉(色だけに頼らず、言葉で伝える) */
+function checkText(bridge: CashBridge | null): string {
+  const status = cashCheckStatus(bridge)
+  if (bridge === null || status === 'none') return '照合不可'
+  return status === 'match' ? '一致' : `差あり(${formatSignedAmount(bridge.other)})`
+}
+
+/** 期ごとの比較表(行: 営業・投資・財務・フリー・合計・為替・期末残高・突き合わせ、列: 期) */
 function CashFlowTable({
   summaries,
   headings,
+  bridges,
 }: {
   readonly summaries: readonly CashFlowSummary[]
   readonly headings: readonly string[]
+  readonly bridges: readonly (CashBridge | null)[]
 }) {
-  const rows: readonly { readonly label: string; readonly pick: (s: CashFlowSummary) => number | null }[] = [
+  const rows: readonly { readonly label: string; readonly cell: (s: CashFlowSummary, i: number) => string }[] = [
     ...CASH_FLOW_KINDS.map((k, i) => ({
       label: `${i + 1}. ${k.label}`,
-      pick: (s: CashFlowSummary) => cashFlowValue(s, k.key),
+      cell: (s: CashFlowSummary) => signed(cashFlowValue(s, k.key)),
     })),
-    { label: 'フリーキャッシュフロー(営業 + 投資)', pick: (s) => s.free },
-    { label: '3 区分の合計', pick: (s) => s.net },
+    { label: 'フリーキャッシュフロー(営業 + 投資)', cell: (s) => signed(s.free) },
+    { label: '3 区分の合計', cell: (s) => signed(s.net) },
+    { label: '為替の影響', cell: (s) => signed(s.fx) },
+    { label: '現金及び現金同等物の期末残高', cell: (s) => (s.cashEnd === null ? '—' : formatAmount(s.cashEnd)) },
+    { label: '現金の増減との突き合わせ', cell: (_, i) => checkText(bridges[i]) },
   ]
   return (
     <div className="relative overflow-x-auto">
@@ -124,7 +138,7 @@ function CashFlowTable({
               </th>
               {summaries.map((s, i) => (
                 <td key={`${row.label}-${i}`} className="px-3 py-2">
-                  {signed(row.pick(s))}
+                  {row.cell(s, i)}
                 </td>
               ))}
             </tr>
@@ -149,6 +163,8 @@ export function CashFlowView({ company }: Props) {
   const chartPeriods = useMemo(() => periods.filter((_, i) => withData[i]), [periods, withData])
   const chartSummaries = useMemo(() => summaries.filter((_, i) => withData[i]), [summaries, withData])
   const basisChanges = useMemo(() => (mixed ? basisChangeLabels(chartPeriods) : []), [mixed, chartPeriods])
+  // 期ごとの、現金の増減との突き合わせ(リストで、すぐ前にある期を期首の根拠にする)
+  const bridges = useMemo(() => periods.map((p, i) => reconcileCash(periods[i - 1], p)), [periods])
 
   if (lastWithData < 0) {
     return (
@@ -206,6 +222,11 @@ export function CashFlowView({ company }: Props) {
                 </p>
               </div>
             ) : null}
+            <h4 className="mt-6 font-bold">現金の増減との突き合わせ</h4>
+            <p className="mt-1 max-w-[44rem] text-solid-gray-800">
+              計算書は、「期首の現金 + 営業 + 投資 + 財務 + 為替の影響 = 期末の現金」の形で終わります。この式が、書類の数字で合っているかを確かめます。
+            </p>
+            <CashBridgeView bridge={bridges[index]} unit={company.unit} />
           </div>
         ) : (
           <p className="mt-3">この期のキャッシュフローの数字は、書類にありません。</p>
@@ -230,7 +251,7 @@ export function CashFlowView({ company }: Props) {
       <Section title="期ごとの比較表">
         <Panel>
           <UnitNote>{amountUnitText(company.unit)}</UnitNote>
-          <CashFlowTable summaries={summaries} headings={headings} />
+          <CashFlowTable summaries={summaries} headings={headings} bridges={bridges} />
         </Panel>
       </Section>
     </div>

@@ -11,7 +11,9 @@ export function companyLabel(company: { readonly name: string }): string {
 
 /** 金額(整数でなくても桁区切りで表示) */
 export function formatAmount(value: number): string {
-  return value.toLocaleString('ja-JP', { maximumFractionDigits: 1 })
+  const text = value.toLocaleString('ja-JP', { maximumFractionDigits: 1 })
+  // 丸めて 0 になる負の数(-0.04 など)は、「-0」ではなく「0」にする
+  return text === '-0' ? '0' : text
 }
 
 /** 小数点以下 digits 桁に丸めた文字列。丸めて 0 になる値は「-0.0」ではなく「0.0」にする */
@@ -39,7 +41,8 @@ export function formatSignedPercent(value: number | null): string {
 
 /** 増減額を符号つきで表示する */
 export function formatSignedAmount(value: number): string {
-  return `${value > 0 ? '+' : ''}${formatAmount(value)}`
+  const text = formatAmount(value)
+  return value > 0 && text !== '0' ? `+${text}` : text
 }
 
 const PERIOD_LABEL = /^(\d{4})年(\d{1,2})月期$/

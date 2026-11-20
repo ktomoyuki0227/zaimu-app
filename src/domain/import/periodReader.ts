@@ -309,7 +309,37 @@ export function readCashFlows(
   }
 }
 
-interface IncomeReading extends CashFlowReading {
+/** キャッシュフロー計算書の、現金残高まわりの 3 項目。書類に無ければ null */
+export interface CashBalanceReading {
+  readonly cashEnd: FieldExtraction | null
+  readonly cashChange: FieldExtraction | null
+  readonly fxEffect: FieldExtraction | null
+}
+
+/**
+ * 現金及び現金同等物の期末残高・増減額・為替の影響を読む(現金の増減との突き合わせに使う)。
+ * IFRS には、増減額を「為替の影響の前」で出す書類もある。その書類では、為替の影響を足して、他と同じ「為替込み」にそろえる。
+ */
+export function readCashBalances(
+  r: Reader,
+  names: {
+    readonly end: readonly string[]
+    readonly change: readonly string[]
+    readonly changeBeforeFx?: readonly string[]
+    readonly fx: readonly string[]
+  },
+): CashBalanceReading {
+  const fxEffect = r.first(names.fx)
+  let cashChange = r.first(names.change)
+  const before = names.changeBeforeFx === undefined ? undefined : r.all(names.changeBeforeFx)[0]
+  if (cashChange === null && before !== undefined) {
+    const sources = fxEffect === null ? [before.label] : [before.label, ...fxEffect.sources]
+    cashChange = derived(before.value + (fxEffect?.value ?? 0), sources)
+  }
+  return { cashEnd: r.first(names.end), cashChange, fxEffect }
+}
+
+interface IncomeReading extends CashFlowReading, CashBalanceReading {
   readonly pl: IncomeStatement
 }
 
@@ -379,6 +409,11 @@ function readIncomeStatement(r: Reader, interestBearingDebt: number, issues: Iss
       operating: ['NetCashProvidedByUsedInOperatingActivities'],
       investing: ['NetCashProvidedByUsedInInvestmentActivities', 'NetCashProvidedByUsedInInvestingActivities'],
       financing: ['NetCashProvidedByUsedInFinancingActivities'],
+    }),
+    ...readCashBalances(r, {
+      end: ['CashAndCashEquivalents'],
+      change: ['NetIncreaseDecreaseInCashAndCashEquivalents'],
+      fx: ['EffectOfExchangeRateChangeOnCashAndCashEquivalents'],
     }),
   }
 }
@@ -482,6 +517,9 @@ export function readPeriod(entries: Entries, endDate: string, label: string): Pe
       operatingCashFlow: income.operatingCashFlow,
       investingCashFlow: income.investingCashFlow,
       financingCashFlow: income.financingCashFlow,
+      cashEnd: income.cashEnd,
+      cashChange: income.cashChange,
+      fxEffect: income.fxEffect,
     },
     ...issues,
   }

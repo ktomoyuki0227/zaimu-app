@@ -164,6 +164,10 @@ export interface CashFlowSummary {
   readonly free: number | null
   /** 3 区分の合計(現金の増減。為替の影響などは含まない) */
   readonly net: number | null
+  /** 為替の影響(現金及び現金同等物に係る換算差額)。書類に無ければ null */
+  readonly fx: number | null
+  /** 現金及び現金同等物の期末残高。書類に無ければ null */
+  readonly cashEnd: number | null
   readonly pattern: CashFlowPattern | null
 }
 
@@ -192,6 +196,8 @@ export function summarizeCashFlow(period: PeriodData): CashFlowSummary {
     financing,
     free: sum([operating, investing]),
     net: sum([operating, investing, financing]),
+    fx: period.pl.fxEffect ?? null,
+    cashEnd: period.pl.cashEnd ?? null,
     pattern: cashFlowPattern(operating, investing, financing),
   }
 }

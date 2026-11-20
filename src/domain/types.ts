@@ -39,11 +39,21 @@ export interface IncomeStatementInput {
   readonly investingCashFlow?: number
   /** 財務キャッシュフロー(借入・返済・配当・自己株式など。プラス: 資金が入った / マイナス: 資金が出た) */
   readonly financingCashFlow?: number
+  /** 現金及び現金同等物の期末残高(キャッシュフロー計算書の最後の行)。現金の増減との突き合わせに使う */
+  readonly cashEnd?: number
+  /** 現金及び現金同等物の増減額(為替の影響を含む)。期首残高が分からないときに、期首を割り出すのに使う */
+  readonly cashChange?: number
+  /** 現金及び現金同等物に係る換算差額(為替の影響)。プラス: 資金が増えた / マイナス: 減った */
+  readonly fxEffect?: number
 }
 
 /** キャッシュフロー計算書の 3 つの区分。この順が、計算書の正式な並び(営業 → 投資 → 財務) */
 export const CASH_FLOW_KEYS = ['operatingCashFlow', 'investingCashFlow', 'financingCashFlow'] as const
 export type CashFlowKey = (typeof CASH_FLOW_KEYS)[number]
+
+/** キャッシュフロー計算書の、現金残高まわりの 3 項目(任意)。現金の増減との突き合わせに使う */
+export const CASH_BALANCE_KEYS = ['cashEnd', 'cashChange', 'fxEffect'] as const
+export type CashBalanceKey = (typeof CASH_BALANCE_KEYS)[number]
 
 /** 数字の範囲。連結: 子会社を含むグループ全体 / 単体: その会社だけ */
 export type Basis = 'consolidated' | 'individual'

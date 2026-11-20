@@ -112,3 +112,18 @@ describe('toCompany: キャッシュフローの 3 区分', () => {
     expect(p?.pl.operatingCashFlow).toBe(7_000)
   })
 })
+
+describe('toCompany: 現金残高の突き合わせ用の項目', () => {
+  test('期末残高・増減額・為替の影響を、会社の単位(百万円)に直して持つ', () => {
+    const p = toCompany(extract(), 'x')?.periods[1]
+    expect(p?.pl.cashEnd).toBe(10_500)
+    expect(p?.pl.cashChange).toBe(600)
+    expect(p?.pl.fxEffect).toBe(100)
+  })
+
+  test('書類に無い項目は、項目ごと持たない(0 にしない)', () => {
+    const p = toCompany(extract({ omit: ['EffectOfExchangeRateChangeOnCashAndCashEquivalents'] }), 'x')?.periods[1]
+    expect(p?.pl).not.toHaveProperty('fxEffect')
+    expect(p?.pl.cashEnd).toBe(10_500)
+  })
+})

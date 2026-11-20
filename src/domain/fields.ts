@@ -57,4 +57,25 @@ export const PL_FIELDS: readonly FieldDef<keyof IncomeStatementInput>[] = [
     optional: true,
     hint: '借入・返済・配当など。返済や配当が多いとマイナス',
   },
+  {
+    key: 'cashEnd',
+    label: '現金及び現金同等物の期末残高',
+    section: '補足',
+    optional: true,
+    hint: 'キャッシュフロー計算書の最後の行。現金の増減との突き合わせに使う',
+  },
+  {
+    key: 'cashChange',
+    label: '現金及び現金同等物の増減額',
+    section: '補足',
+    optional: true,
+    hint: '為替の影響を含む増減。期首残高が分からないときに使う',
+  },
+  {
+    key: 'fxEffect',
+    label: '現金及び現金同等物に係る換算差額',
+    section: '補足',
+    optional: true,
+    hint: '為替の影響。プラスは増えた、マイナスは減った',
+  },
 ]

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { amountUnitText, formatChange, formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel, withUnit } from './format'
+import { amountUnitText, formatAmount, formatChange, formatMetric, formatSignedAmount, formatSignedPercent, shortPeriodLabel, withUnit } from './format'
 
 describe('formatMetric', () => {
   test('単位ごとの桁数で表示する', () => {
@@ -38,6 +38,15 @@ describe('formatSignedAmount', () => {
     expect(formatSignedAmount(1200)).toBe('+1,200')
     expect(formatSignedAmount(-50)).toBe('-50')
     expect(formatSignedAmount(0)).toBe('0')
+  })
+
+  test('丸めて 0 になる値は、「-0」「+0」にしない(足し引きの端数が出る数字で)', () => {
+    expect(formatSignedAmount(-0.04)).toBe('0')
+    expect(formatSignedAmount(-1.4e-13)).toBe('0')
+    expect(formatSignedAmount(0.04)).toBe('0')
+    expect(formatAmount(-0.04)).toBe('0')
+    expect(formatSignedAmount(0.06)).toBe('+0.1')
+    expect(formatSignedAmount(-0.06)).toBe('-0.1')
   })
 })
 

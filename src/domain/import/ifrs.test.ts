@@ -320,3 +320,65 @@ describe('IFRS の書類: キャッシュフローの 3 区分', () => {
     expect(p.financingCashFlow).toBeNull()
   })
 })
+
+describe('IFRS の書類: 現金残高の突き合わせ用の項目', () => {
+  test('期末残高・増減額(為替込み)・為替の影響を、当期と前期のそれぞれで読む', () => {
+    const result = extract()
+    const p = result.periods[1]
+    expect(p.cashEnd).toMatchObject({ value: 10_000 * M, status: 'found' })
+    expect(p.cashChange).toMatchObject({ value: 3_600 * M, status: 'found' })
+    expect(p.fxEffect?.value).toBe(100 * M)
+    expect(result.periods[0].cashEnd?.value).toBe(6_400 * M)
+    expect(result.periods[0].cashChange?.value).toBe(3_240 * M)
+  })
+
+  test('増減額を「為替の影響の前」で出す書類は、為替の影響を足して、為替込みにそろえる', () => {
+    const rows = ifrsFixtureRows({ omit: ['NetIncreaseDecreaseInCashAndCashEquivalentsIFRS'] })
+    for (const [context, millions] of [
+      ['CurrentYearDuration', 3_500],
+      ['Prior1YearDuration', 3_150],
+    ] as const) {
+      rows.push({
+        elementId: 'jpigp_cor:NetIncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChangesIFRS',
+        label: '現金及び現金同等物の増減額(為替の影響前)(IFRS)',
+        contextId: context,
+        consolidation: '連結',
+        unit: '円',
+        value: String(millions * M),
+      })
+    }
+    const parsed = parseEdinetCsv(buildCsvText(rows), 100_000)
+    if (!parsed.ok) throw new Error(parsed.reason)
+    const result = extractFromFacts(parsed.facts, parsed.info)
+    expect(result.periods[1].cashChange).toMatchObject({ value: 3_600 * M, status: 'derived', confidence: 'high' })
+    expect(result.periods[0].cashChange?.value).toBe(3_240 * M)
+    expect(result.needsReview).toBe(false)
+  })
+
+  test('為替の影響が書類に無く、為替の影響前の増減額だけがあるときは、その増減額をそのまま使う', () => {
+    const rows = ifrsFixtureRows({
+      omit: ['NetIncreaseDecreaseInCashAndCashEquivalentsIFRS', 'EffectOfExchangeRateChangesOnCashAndCashEquivalentsIFRS'],
+    })
+    rows.push({
+      elementId: 'jpigp_cor:NetIncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChangesIFRS',
+      label: '現金及び現金同等物の増減額(為替の影響前)(IFRS)',
+      contextId: 'CurrentYearDuration',
+      consolidation: '連結',
+      unit: '円',
+      value: String(3_500 * M),
+    })
+    const parsed = parseEdinetCsv(buildCsvText(rows), 100_000)
+    if (!parsed.ok) throw new Error(parsed.reason)
+    const p = extractFromFacts(parsed.facts, parsed.info).periods[1]
+    expect(p.fxEffect).toBeNull()
+    expect(p.cashChange?.value).toBe(3_500 * M)
+  })
+
+  test('書類に無い項目は null', () => {
+    const p = extract({
+      omit: ['EffectOfExchangeRateChangesOnCashAndCashEquivalentsIFRS', 'NetIncreaseDecreaseInCashAndCashEquivalentsIFRS'],
+    }).periods[1]
+    expect(p.fxEffect).toBeNull()
+    expect(p.cashChange).toBeNull()
+  })
+})

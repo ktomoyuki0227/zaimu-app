@@ -15,7 +15,8 @@ import {
 
 export const IFRS_LINES: readonly Line[] = [
   // 財政状態計算書
-  line('CashAndCashEquivalentsIFRS', '現金及び現金同等物(IFRS)', 'instant', 10_000),
+  // 前期の現金は、当期の現金の増減(営業 7,000 − 投資 5,000 + 財務 1,500 + 為替 100 = 3,600)を引いた 6,400
+  { element: 'CashAndCashEquivalentsIFRS', label: '現金及び現金同等物(IFRS)', kind: 'instant', current: 10_000, prior: 6_400 },
   line('TradeAndOtherReceivablesCAIFRS', '営業債権及びその他の債権、流動資産(IFRS)', 'instant', 15_000),
   line('OtherFinancialAssetsCAIFRS', 'その他の金融資産、流動資産(IFRS)', 'instant', 1_000),
   line('InventoriesCAIFRS', '棚卸資産、流動資産(IFRS)', 'instant', 12_000),
@@ -44,6 +45,21 @@ export const IFRS_LINES: readonly Line[] = [
   line('NetCashProvidedByUsedInOperatingActivitiesIFRS', '営業活動によるキャッシュ・フロー(IFRS)', 'duration', 7_000),
   line('NetCashProvidedByUsedInInvestingActivitiesIFRS', '投資活動によるキャッシュ・フロー(IFRS)', 'duration', -5_000),
   line('NetCashProvidedByUsedInFinancingActivitiesIFRS', '財務活動によるキャッシュ・フロー(IFRS)', 'duration', 1_500),
+  // 前期は、各区分が 0.9 倍: 6,300 − 4,500 + 1,350 + 90 = 3,240
+  {
+    element: 'EffectOfExchangeRateChangesOnCashAndCashEquivalentsIFRS',
+    label: '現金及び現金同等物に係る換算差額(IFRS)',
+    kind: 'duration',
+    current: 100,
+    prior: 90,
+  },
+  {
+    element: 'NetIncreaseDecreaseInCashAndCashEquivalentsIFRS',
+    label: '現金及び現金同等物の増減額(IFRS)',
+    kind: 'duration',
+    current: 3_600,
+    prior: 3_240,
+  },
 ]
 
 export interface IfrsFixtureOptions extends FixtureOptions {

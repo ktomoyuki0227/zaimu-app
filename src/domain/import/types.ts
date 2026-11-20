@@ -1,4 +1,4 @@
-import type { BalanceSheetInput, CashFlowKey, IncomeStatementInput } from '../types'
+import type { BalanceSheetInput, CashBalanceKey, CashFlowKey, IncomeStatementInput } from '../types'
 
 /** CSV の 1 行(1 つの数値)。金額は円 */
 export interface SourceFact {
@@ -50,7 +50,7 @@ export interface FieldExtraction {
 }
 
 export type BsFieldKey = keyof BalanceSheetInput
-export type PlFieldKey = Exclude<keyof IncomeStatementInput, CashFlowKey>
+export type PlFieldKey = Exclude<keyof IncomeStatementInput, CashFlowKey | CashBalanceKey>
 
 export interface ExtractedPeriod {
   readonly endDate: string
@@ -63,6 +63,12 @@ export interface ExtractedPeriod {
   readonly investingCashFlow: FieldExtraction | null
   /** 財務キャッシュフロー(任意)。書類に無ければ null */
   readonly financingCashFlow: FieldExtraction | null
+  /** 現金及び現金同等物の期末残高(任意)。書類に無ければ null */
+  readonly cashEnd: FieldExtraction | null
+  /** 現金及び現金同等物の増減額(為替の影響を含む)(任意)。書類に無ければ null */
+  readonly cashChange: FieldExtraction | null
+  /** 現金及び現金同等物に係る換算差額(為替の影響)(任意)。書類に無ければ null */
+  readonly fxEffect: FieldExtraction | null
 }
 
 export interface ExtractionResult {

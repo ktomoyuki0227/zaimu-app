@@ -36,6 +36,8 @@ export const SAMPLE_COMPANY: Company = {
         nonOperatingIncome: 40, interestExpense: 60, otherNonOperatingExpense: 20,
         extraordinaryGain: 0, extraordinaryLoss: 30, incomeTaxes: 130, depreciation: 250,
         operatingCashFlow: 520, investingCashFlow: -380, financingCashFlow: -190,
+        // 現金の増減: 期末残高は貸借対照表の現金預金と同じ(練習用なので、為替の影響は無し)
+        cashEnd: 900, cashChange: -50,
       },
       {
         cash: 900, receivables: 1500, securities: 100, inventory: 1000, otherCurrentAssets: 100,
@@ -50,6 +52,8 @@ export const SAMPLE_COMPANY: Company = {
         nonOperatingIncome: 40, interestExpense: 55, otherNonOperatingExpense: 15,
         extraordinaryGain: 0, extraordinaryLoss: 10, incomeTaxes: 170, depreciation: 260,
         operatingCashFlow: 560, investingCashFlow: -310, financingCashFlow: -150,
+        // 現金の増減: 期末残高は貸借対照表の現金預金と同じ(練習用なので、為替の影響は無し)
+        cashEnd: 1000, cashChange: 100,
       },
       {
         cash: 1000, receivables: 1600, securities: 100, inventory: 1050, otherCurrentAssets: 100,
@@ -64,6 +68,8 @@ export const SAMPLE_COMPANY: Company = {
         nonOperatingIncome: 50, interestExpense: 50, otherNonOperatingExpense: 10,
         extraordinaryGain: 20, extraordinaryLoss: 0, incomeTaxes: 200, depreciation: 270,
         operatingCashFlow: 640, investingCashFlow: -330, financingCashFlow: -210,
+        // 現金の増減: 期末残高は貸借対照表の現金預金と同じ(練習用なので、為替の影響は無し)
+        cashEnd: 1100, cashChange: 100,
       },
       {
         cash: 1100, receivables: 1750, securities: 100, inventory: 1150, otherCurrentAssets: 100,
@@ -78,6 +84,8 @@ export const SAMPLE_COMPANY: Company = {
         nonOperatingIncome: 40, interestExpense: 45, otherNonOperatingExpense: 15,
         extraordinaryGain: 0, extraordinaryLoss: 60, incomeTaxes: 170, depreciation: 280,
         operatingCashFlow: 480, investingCashFlow: -360, financingCashFlow: -70,
+        // 現金の増減: 期末残高は貸借対照表の現金預金と同じ(練習用なので、為替の影響は無し)
+        cashEnd: 1150, cashChange: 50,
       },
       {
         cash: 1150, receivables: 1850, securities: 100, inventory: 1300, otherCurrentAssets: 100,
@@ -92,6 +100,8 @@ export const SAMPLE_COMPANY: Company = {
         nonOperatingIncome: 45, interestExpense: 40, otherNonOperatingExpense: 10,
         extraordinaryGain: 0, extraordinaryLoss: 0, incomeTaxes: 300, depreciation: 290,
         operatingCashFlow: 780, investingCashFlow: -300, financingCashFlow: -130,
+        // 現金の増減: 期末残高は貸借対照表の現金預金と同じ(練習用なので、為替の影響は無し)
+        cashEnd: 1500, cashChange: 350,
       },
       {
         cash: 1500, receivables: 2000, securities: 100, inventory: 1350, otherCurrentAssets: 100,

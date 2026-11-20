@@ -68,6 +68,29 @@ export const BASE_LINES: readonly Line[] = [
   // 日本基準の投資活動の標準科目は「Investment」(綴りが他と違う)
   line('NetCashProvidedByUsedInInvestmentActivities', '投資活動によるキャッシュ・フロー', 'duration', -5_000),
   line('NetCashProvidedByUsedInFinancingActivities', '財務活動によるキャッシュ・フロー', 'duration', -1_500),
+  // 現金の増減: 営業 7,000 − 投資 5,000 − 財務 1,500 + 為替 100 = 増減額 600、期首 9,900 + 600 = 期末 10,500
+  // (前期は、各区分が 0.9 倍: 6,300 − 4,500 − 1,350 + 90 = 540)。貸借対照表の現金預金(10,000)とは、定義の違いで 500 ずれる
+  {
+    element: 'EffectOfExchangeRateChangeOnCashAndCashEquivalents',
+    label: '現金及び現金同等物に係る換算差額',
+    kind: 'duration',
+    current: 100,
+    prior: 90,
+  },
+  {
+    element: 'NetIncreaseDecreaseInCashAndCashEquivalents',
+    label: '現金及び現金同等物の増減額',
+    kind: 'duration',
+    current: 600,
+    prior: 540,
+  },
+  {
+    element: 'CashAndCashEquivalents',
+    label: '現金及び現金同等物の期末残高',
+    kind: 'instant',
+    current: 10_500,
+    prior: 9_900,
+  },
 ]
 
 export interface FixtureOptions {

@@ -212,3 +212,30 @@ describe('parseCompany: キャッシュフロー(任意)', () => {
     expect(parseCompany(withPl({ investingCashFlow: 1e16 }))).toBeNull()
   })
 })
+
+describe('parseCompany: 現金残高の項目(任意)', () => {
+  const withPl = (extra: Record<string, unknown>) => ({
+    id: 'c1',
+    name: 'テスト社',
+    periods: [{ ...basePeriod, pl: { ...basePeriod.pl, ...extra } }],
+  })
+
+  test('3 項目とも任意。あれば数として受け付け、往復しても残る', () => {
+    const company = parseCompany(withPl({ cashEnd: 1000, cashChange: -50, fxEffect: 20 }))
+    expect(company?.periods[0].pl).toMatchObject({ cashEnd: 1000, cashChange: -50, fxEffect: 20 })
+    const again = parseCompany(JSON.parse(JSON.stringify(company)))
+    expect(again?.periods[0].pl).toMatchObject({ cashEnd: 1000, cashChange: -50, fxEffect: 20 })
+  })
+
+  test('無くてもよい(古い保存データ)', () => {
+    const pl = parseCompany(withPl({}))?.periods[0].pl
+    expect(pl).not.toHaveProperty('cashEnd')
+    expect(pl).not.toHaveProperty('fxEffect')
+  })
+
+  test('数でない・上限を超える値は、壊れたデータ(null)', () => {
+    expect(parseCompany(withPl({ cashEnd: '1' }))).toBeNull()
+    expect(parseCompany(withPl({ fxEffect: Number.NaN }))).toBeNull()
+    expect(parseCompany(withPl({ cashChange: 1e16 }))).toBeNull()
+  })
+})

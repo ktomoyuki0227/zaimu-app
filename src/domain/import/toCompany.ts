@@ -1,5 +1,6 @@
 import { UNIT_DIVISOR } from '../units'
 import { parseCompany } from '../validate'
+import { CASH_BALANCE_KEYS, CASH_FLOW_KEYS } from '../types'
 import type { AmountUnit, Basis, Company, IncomeStatementInput, PeriodData } from '../types'
 import type { ExtractedPeriod, ExtractionResult } from './types'
 
@@ -26,18 +27,24 @@ function values<K extends string>(
   return out
 }
 
+const OPTIONAL_KEYS = [...CASH_FLOW_KEYS, ...CASH_BALANCE_KEYS] as const
+
+/** 書類にあった任意の項目だけを、単位を直して取り出す(無い項目は、0 にせず、入れない) */
+function optionalAmounts(extracted: ExtractedPeriod, divisor: number): Partial<IncomeStatementInput> {
+  const out: Partial<Record<(typeof OPTIONAL_KEYS)[number], number>> = {}
+  for (const key of OPTIONAL_KEYS) {
+    const field = extracted[key]
+    if (field !== null) {
+      out[key] = field.value / divisor
+    }
+  }
+  return out
+}
+
 function toPeriod(extracted: ExtractedPeriod, divisor: number, basis: Basis): PeriodData {
   const pl: IncomeStatementInput = {
     ...values(extracted.pl, divisor),
-    ...(extracted.operatingCashFlow === null
-      ? {}
-      : { operatingCashFlow: extracted.operatingCashFlow.value / divisor }),
-    ...(extracted.investingCashFlow === null
-      ? {}
-      : { investingCashFlow: extracted.investingCashFlow.value / divisor }),
-    ...(extracted.financingCashFlow === null
-      ? {}
-      : { financingCashFlow: extracted.financingCashFlow.value / divisor }),
+    ...optionalAmounts(extracted, divisor),
   }
   return { label: extracted.label, basis, bs: values(extracted.bs, divisor), pl }
 }

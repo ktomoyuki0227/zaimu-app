@@ -423,3 +423,42 @@ describe('extractFromFacts: キャッシュフローの 3 区分(日本基準)',
     expect(result.needsReview).toBe(false)
   })
 })
+
+describe('extractFromFacts: 現金残高の突き合わせ用の項目(日本基準)', () => {
+  test('期末残高・増減額・為替の影響を、当期と前期のそれぞれで読む', () => {
+    const result = extract()
+    const current = result.periods[1]
+    expect(current.cashEnd).toMatchObject({ value: 10_500 * M, status: 'found', confidence: 'high' })
+    expect(current.cashChange?.value).toBe(600 * M)
+    expect(current.fxEffect?.value).toBe(100 * M)
+    const prior = result.periods[0]
+    expect(prior.cashEnd?.value).toBe(9_900 * M)
+    expect(prior.cashChange?.value).toBe(540 * M)
+    expect(prior.fxEffect?.value).toBe(90 * M)
+  })
+
+  test('為替の影響は、国内だけの会社には無い。書類に無ければ null(0 にしない)', () => {
+    const result = extract({ omit: ['EffectOfExchangeRateChangeOnCashAndCashEquivalents'] })
+    expect(result.periods[1].fxEffect).toBeNull()
+    expect(result.periods[1].cashEnd?.value).toBe(10_500 * M)
+  })
+
+  test('現金残高の項目が無い書類でも、エラーにも確認事項にもしない', () => {
+    const result = extract({
+      omit: [
+        'CashAndCashEquivalents',
+        'NetIncreaseDecreaseInCashAndCashEquivalents',
+        'EffectOfExchangeRateChangeOnCashAndCashEquivalents',
+      ],
+    })
+    expect(result.errors).toEqual([])
+    expect(result.needsReview).toBe(false)
+    expect(result.periods[1]).toMatchObject({ cashEnd: null, cashChange: null, fxEffect: null })
+  })
+
+  test('貸借対照表の現金及び預金(CashAndDeposits)と、キャッシュフロー計算書の期末残高は、別の科目として読む', () => {
+    const p = extract().periods[1]
+    expect(p.bs.cash.value).toBe(10_000 * M)
+    expect(p.cashEnd?.value).toBe(10_500 * M)
+  })
+})
