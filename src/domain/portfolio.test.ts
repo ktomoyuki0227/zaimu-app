@@ -186,3 +186,13 @@ describe('removeCompany', () => {
     expect(removeCompany(list, 'zzz')).toHaveLength(2)
   })
 })
+
+describe('mergeCompany: キャッシュフロー', () => {
+  test('単位をそろえるとき、3 区分も、ほかの金額と同じ割合で直す(符号は変えない)', () => {
+    const cf = { operatingCashFlow: 2_000_000, investingCashFlow: -1_000_000, financingCashFlow: -500_000 }
+    const existing = company('c', '甲', [{ ...period('2024年3月期', 5_000_000), pl: { ...period('x', 1).pl, ...cf } }], '千円')
+    const incoming = company('c', '甲', [period('2025年3月期', 6_000)], '百万円')
+    const merged = mergeCompany(existing, incoming)
+    expect(merged.periods[0].pl).toMatchObject({ operatingCashFlow: 2_000, investingCashFlow: -1_000, financingCashFlow: -500 })
+  })
+})

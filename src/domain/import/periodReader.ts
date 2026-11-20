@@ -287,9 +287,30 @@ export function assembleBalanceSheet(
   }
 }
 
-interface IncomeReading {
-  readonly pl: IncomeStatement
+/** キャッシュフロー計算書の 3 区分(営業・投資・財務)。書類に無ければ null */
+export interface CashFlowReading {
   readonly operatingCashFlow: FieldExtraction | null
+  readonly investingCashFlow: FieldExtraction | null
+  readonly financingCashFlow: FieldExtraction | null
+}
+
+/**
+ * キャッシュフロー 3 区分を読む。日本基準の投資活動は、標準の科目名が「Investment」(綴りが他と違う)。
+ * 投資・財務はマイナス(資金が出た)が普通なので、符号は、書類のまま使う。
+ */
+export function readCashFlows(
+  r: Reader,
+  names: { readonly operating: readonly string[]; readonly investing: readonly string[]; readonly financing: readonly string[] },
+): CashFlowReading {
+  return {
+    operatingCashFlow: r.first(names.operating),
+    investingCashFlow: r.first(names.investing),
+    financingCashFlow: r.first(names.financing),
+  }
+}
+
+interface IncomeReading extends CashFlowReading {
+  readonly pl: IncomeStatement
 }
 
 /** 損益計算書。売上高が無い書類(業種別の様式)は読めない */
@@ -354,7 +375,11 @@ function readIncomeStatement(r: Reader, interestBearingDebt: number, issues: Iss
       incomeTaxes,
       depreciation,
     },
-    operatingCashFlow: r.first(['NetCashProvidedByUsedInOperatingActivities']),
+    ...readCashFlows(r, {
+      operating: ['NetCashProvidedByUsedInOperatingActivities'],
+      investing: ['NetCashProvidedByUsedInInvestmentActivities', 'NetCashProvidedByUsedInInvestingActivities'],
+      financing: ['NetCashProvidedByUsedInFinancingActivities'],
+    }),
   }
 }
 
@@ -449,7 +474,15 @@ export function readPeriod(entries: Entries, endDate: string, label: string): Pe
   collectNotes(reader, issues)
 
   return {
-    period: { endDate, label, bs, pl: income.pl, operatingCashFlow: income.operatingCashFlow },
+    period: {
+      endDate,
+      label,
+      bs,
+      pl: income.pl,
+      operatingCashFlow: income.operatingCashFlow,
+      investingCashFlow: income.investingCashFlow,
+      financingCashFlow: income.financingCashFlow,
+    },
     ...issues,
   }
 }

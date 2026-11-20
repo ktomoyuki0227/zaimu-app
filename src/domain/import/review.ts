@@ -1,4 +1,5 @@
 import { BS_FIELDS, PL_FIELDS } from '../fields'
+import { CASH_FLOW_KEYS, type CashFlowKey } from '../types'
 import type { FieldExtraction, FieldStatus, ExtractionResult } from './types'
 
 /** 確認画面に出す、「自動で決めきれなかった項目」 */
@@ -11,6 +12,10 @@ export interface AttentionItem {
   /** 値の根拠になった書類上の項目名 */
   readonly sources: readonly string[]
   readonly note: string | undefined
+}
+
+function isCashFlowKey(key: string): key is CashFlowKey {
+  return (CASH_FLOW_KEYS as readonly string[]).includes(key)
 }
 
 /** 取れなかった(0 の仮置き)か、差額・近似で求めた(取り違えの余地がある)項目か */
@@ -41,8 +46,8 @@ export function attentionItems(result: ExtractionResult): readonly AttentionItem
       push(period.label, def.label, period.bs[def.key])
     }
     for (const def of PL_FIELDS) {
-      if (def.key === 'operatingCashFlow') {
-        push(period.label, def.label, period.operatingCashFlow)
+      if (isCashFlowKey(def.key)) {
+        push(period.label, def.label, period[def.key])
       } else {
         push(period.label, def.label, period.pl[def.key])
       }

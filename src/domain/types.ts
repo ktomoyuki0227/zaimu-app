@@ -35,7 +35,15 @@ export interface IncomeStatementInput {
   readonly depreciation: number // 減価償却費(債務償還年数の計算に使う)
   /** 営業キャッシュフロー。分かる場合のみ入力すると債務償還年数がより正確になる */
   readonly operatingCashFlow?: number
+  /** 投資キャッシュフロー(設備投資・有価証券の取得など。プラス: 資金が入った / マイナス: 資金が出た) */
+  readonly investingCashFlow?: number
+  /** 財務キャッシュフロー(借入・返済・配当・自己株式など。プラス: 資金が入った / マイナス: 資金が出た) */
+  readonly financingCashFlow?: number
 }
+
+/** キャッシュフロー計算書の 3 つの区分。この順が、計算書の正式な並び(営業 → 投資 → 財務) */
+export const CASH_FLOW_KEYS = ['operatingCashFlow', 'investingCashFlow', 'financingCashFlow'] as const
+export type CashFlowKey = (typeof CASH_FLOW_KEYS)[number]
 
 /** 数字の範囲。連結: 子会社を含むグループ全体 / 単体: その会社だけ */
 export type Basis = 'consolidated' | 'individual'

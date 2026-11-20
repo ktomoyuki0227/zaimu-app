@@ -32,6 +32,12 @@ function toPeriod(extracted: ExtractedPeriod, divisor: number, basis: Basis): Pe
     ...(extracted.operatingCashFlow === null
       ? {}
       : { operatingCashFlow: extracted.operatingCashFlow.value / divisor }),
+    ...(extracted.investingCashFlow === null
+      ? {}
+      : { investingCashFlow: extracted.investingCashFlow.value / divisor }),
+    ...(extracted.financingCashFlow === null
+      ? {}
+      : { financingCashFlow: extracted.financingCashFlow.value / divisor }),
   }
   return { label: extracted.label, basis, bs: values(extracted.bs, divisor), pl }
 }

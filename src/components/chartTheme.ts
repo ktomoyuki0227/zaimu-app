@@ -41,3 +41,13 @@ export function yAxisWidth(values: readonly number[], format: (value: number) =>
   const width = Math.ceil((longest + 1) * TICK_CHAR_PX) + 8
   return Math.min(Y_AXIS_MAX_PX, Math.max(Y_AXIS_MIN_PX, width))
 }
+
+/**
+ * キャッシュフロー 3 区分の色。他のグラフで色の見分けやすさを確かめた色を使い回す
+ * (営業 = 青、投資 = オレンジ、財務 = 紫)。色だけに頼らず、並びと名前、符号でも区別できるようにしている。
+ */
+export const CASH_FLOW_COLORS = {
+  operatingCashFlow: SERIES.sales.color,
+  investingCashFlow: SERIES.operatingProfit.color,
+  financingCashFlow: SERIES.netIncome.color,
+} as const

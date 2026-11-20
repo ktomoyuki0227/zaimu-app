@@ -42,6 +42,8 @@ export const IFRS_LINES: readonly Line[] = [
   line('ProfitLossIFRS', '当期利益(IFRS)', 'duration', 6_720),
   line('DepreciationAndAmortizationOpeCFIFRS', '減価償却費及び償却費、営業活動によるキャッシュ・フロー(IFRS)', 'duration', 4_000),
   line('NetCashProvidedByUsedInOperatingActivitiesIFRS', '営業活動によるキャッシュ・フロー(IFRS)', 'duration', 7_000),
+  line('NetCashProvidedByUsedInInvestingActivitiesIFRS', '投資活動によるキャッシュ・フロー(IFRS)', 'duration', -5_000),
+  line('NetCashProvidedByUsedInFinancingActivitiesIFRS', '財務活動によるキャッシュ・フロー(IFRS)', 'duration', 1_500),
 ]
 
 export interface IfrsFixtureOptions extends FixtureOptions {

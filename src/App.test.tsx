@@ -63,7 +63,7 @@ describe('App: 練習用データと一覧', () => {
     render(<App />)
     fireEvent.click(screen.getByText('練習用データで試す'))
     const nav = await screen.findByRole('navigation', { name: '表示する内容' })
-    for (const name of ['成長性', '収益性', '安定性', '概要']) {
+    for (const name of ['成長性', '収益性', '安定性', 'キャッシュフロー', '概要']) {
       fireEvent.click(within(nav).getByRole('button', { name: new RegExp(name) }))
       expect(within(nav).getByRole('button', { name: new RegExp(name) }).getAttribute('aria-current')).toBe('page')
     }

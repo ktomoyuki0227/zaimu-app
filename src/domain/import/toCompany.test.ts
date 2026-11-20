@@ -97,3 +97,18 @@ describe('toCompany: 期の範囲(連結・単体)', () => {
     expect(company?.periods.every((p) => p.basis === 'individual')).toBe(true)
   })
 })
+
+describe('toCompany: キャッシュフローの 3 区分', () => {
+  test('3 区分を、会社の単位(百万円)に直して持つ。符号は変えない', () => {
+    const p = toCompany(extract(), 'x')?.periods[1]
+    expect(p?.pl.operatingCashFlow).toBe(7_000)
+    expect(p?.pl.investingCashFlow).toBe(-5_000)
+    expect(p?.pl.financingCashFlow).toBe(-1_500)
+  })
+
+  test('書類に無い区分は、項目ごと持たない(古いデータと同じ形)', () => {
+    const p = toCompany(extract({ omit: ['NetCashProvidedByUsedInInvestmentActivities'] }), 'x')?.periods[1]
+    expect(p?.pl).not.toHaveProperty('investingCashFlow')
+    expect(p?.pl.operatingCashFlow).toBe(7_000)
+  })
+})

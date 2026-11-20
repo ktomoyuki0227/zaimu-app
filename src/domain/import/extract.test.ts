@@ -396,3 +396,30 @@ describe('extractFromFacts: 今期から連結を作り始めた会社', () => {
     expect(result.warnings).toEqual(['前期(2024年3月期)のデータが書類にありません。当期だけを取り込みます。'])
   })
 })
+
+describe('extractFromFacts: キャッシュフローの 3 区分(日本基準)', () => {
+  test('営業・投資・財務を、書類の符号のまま読む(投資はマイナスが普通)', () => {
+    const result = extract()
+    const p = result.periods[1]
+    expect(p.operatingCashFlow?.value).toBe(7_000 * M)
+    expect(p.investingCashFlow).toMatchObject({ value: -5_000 * M, status: 'found', confidence: 'high' })
+    expect(p.financingCashFlow?.value).toBe(-1_500 * M)
+    expect(result.periods[0].investingCashFlow?.value).toBe(-4_500 * M)
+  })
+
+  test('投資活動の科目名が「Investing」の綴りの書類も読める', () => {
+    const rows = fixtureRows({ omit: ['NetCashProvidedByUsedInInvestmentActivities'] }).concat(
+      ['CurrentYearDuration', 'Prior1YearDuration'].map((context) => row('NetCashProvidedByUsedInInvestingActivities', context, -3_000)),
+    )
+    const parsed = parseEdinetCsv(buildCsvText(rows), 100_000)
+    if (!parsed.ok) throw new Error(parsed.reason)
+    expect(extractFromFacts(parsed.facts, parsed.info).periods[1].investingCashFlow?.value).toBe(-3_000 * M)
+  })
+
+  test('書類に無い区分は null(0 にしない)。確認事項にもしない', () => {
+    const result = extract({ omit: ['NetCashProvidedByUsedInInvestmentActivities', 'NetCashProvidedByUsedInFinancingActivities'] })
+    expect(result.periods[1].investingCashFlow).toBeNull()
+    expect(result.periods[1].financingCashFlow).toBeNull()
+    expect(result.needsReview).toBe(false)
+  })
+})

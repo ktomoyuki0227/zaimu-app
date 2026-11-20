@@ -187,3 +187,28 @@ describe('parsePortfolio', () => {
     expect(parsePortfolio({ version: 2, companies: many })).toBeNull()
   })
 })
+
+describe('parseCompany: キャッシュフロー(任意)', () => {
+  const withPl = (extra: Record<string, unknown>) => ({
+    id: 'c1',
+    name: 'テスト社',
+    periods: [{ ...basePeriod, pl: { ...basePeriod.pl, ...extra } }],
+  })
+
+  test('3 区分とも任意。あれば数として受け付け、往復しても残る', () => {
+    const company = parseCompany(withPl({ operatingCashFlow: 100, investingCashFlow: -50, financingCashFlow: -20 }))
+    expect(company?.periods[0].pl).toMatchObject({ operatingCashFlow: 100, investingCashFlow: -50, financingCashFlow: -20 })
+    const again = parseCompany(JSON.parse(JSON.stringify(company)))
+    expect(again?.periods[0].pl.investingCashFlow).toBe(-50)
+  })
+
+  test('無くてもよい(古い保存データ)', () => {
+    expect(parseCompany(withPl({}))?.periods[0].pl).not.toHaveProperty('investingCashFlow')
+  })
+
+  test('数でない・上限を超える値は、壊れたデータ(null)', () => {
+    expect(parseCompany(withPl({ investingCashFlow: '1' }))).toBeNull()
+    expect(parseCompany(withPl({ financingCashFlow: Number.NaN }))).toBeNull()
+    expect(parseCompany(withPl({ investingCashFlow: 1e16 }))).toBeNull()
+  })
+})

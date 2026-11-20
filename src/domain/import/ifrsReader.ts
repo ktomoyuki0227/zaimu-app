@@ -7,6 +7,7 @@ import {
   found,
   missing,
   readBsTotals,
+  readCashFlows,
   roundingUnit,
   total,
   type Entries,
@@ -283,7 +284,11 @@ export function readIfrsPeriod(entries: Entries, endDate: string, label: string)
           r.first(['DepreciationAndAmortizationOpeCFIFRS', 'DepreciationAndAmortizationOfIntangibleAssetsOpeCFIFRS']) ??
           missing('減価償却費(キャッシュ・フロー計算書)が見つかりません。0 として仮置きしています。'),
       },
-      operatingCashFlow: r.first(['NetCashProvidedByUsedInOperatingActivitiesIFRS']),
+      ...readCashFlows(r, {
+        operating: ['NetCashProvidedByUsedInOperatingActivitiesIFRS'],
+        investing: ['NetCashProvidedByUsedInInvestingActivitiesIFRS'],
+        financing: ['NetCashProvidedByUsedInFinancingActivitiesIFRS'],
+      }),
     },
     ...issues,
   }

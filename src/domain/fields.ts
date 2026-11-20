@@ -43,4 +43,18 @@ export const PL_FIELDS: readonly FieldDef<keyof IncomeStatementInput>[] = [
     optional: true,
     hint: '分かる場合のみ。空欄なら「純利益+減価償却費」で近似',
   },
+  {
+    key: 'investingCashFlow',
+    label: '投資キャッシュフロー',
+    section: '補足',
+    optional: true,
+    hint: '設備投資・有価証券の取得など。支出が多いとマイナス',
+  },
+  {
+    key: 'financingCashFlow',
+    label: '財務キャッシュフロー',
+    section: '補足',
+    optional: true,
+    hint: '借入・返済・配当など。返済や配当が多いとマイナス',
+  },
 ]

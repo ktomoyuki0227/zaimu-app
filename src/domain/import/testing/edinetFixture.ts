@@ -65,6 +65,9 @@ export const BASE_LINES: readonly Line[] = [
   line('ProfitLoss', '当期純利益', 'duration', 5_600),
   line('DepreciationAndAmortizationOpeCF', '減価償却費', 'duration', 4_000),
   line('NetCashProvidedByUsedInOperatingActivities', '営業活動によるキャッシュ・フロー', 'duration', 7_000),
+  // 日本基準の投資活動の標準科目は「Investment」(綴りが他と違う)
+  line('NetCashProvidedByUsedInInvestmentActivities', '投資活動によるキャッシュ・フロー', 'duration', -5_000),
+  line('NetCashProvidedByUsedInFinancingActivities', '財務活動によるキャッシュ・フロー', 'duration', -1_500),
 ]
 
 export interface FixtureOptions {

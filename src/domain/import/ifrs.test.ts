@@ -306,3 +306,17 @@ describe('IFRS の書類: 確認が必要な値の判定', () => {
     expect(result.warnings.some((w) => w.includes('前期'))).toBe(true)
   })
 })
+
+describe('IFRS の書類: キャッシュフローの 3 区分', () => {
+  test('営業・投資・財務を、書類の符号のまま読む', () => {
+    const p = extract().periods[1]
+    expect(p.operatingCashFlow?.value).toBe(7_000 * M)
+    expect(p.investingCashFlow?.value).toBe(-5_000 * M)
+    expect(p.financingCashFlow?.value).toBe(1_500 * M)
+  })
+
+  test('書類に無い区分は null', () => {
+    const p = extract({ omit: ['NetCashProvidedByUsedInFinancingActivitiesIFRS'] }).periods[1]
+    expect(p.financingCashFlow).toBeNull()
+  })
+})

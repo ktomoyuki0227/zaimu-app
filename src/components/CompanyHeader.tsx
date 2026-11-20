@@ -1,15 +1,17 @@
+import { useEffect, useRef } from 'react'
 import { basisChangeLabels, basisSummary, hasMixedBasis } from '../domain/basis'
 import type { Company } from '../domain/types'
 import { companyLabel } from '../lib/format'
 import { BUTTON_SECONDARY } from './styles'
 
-export type TabId = 'overview' | 'growth' | 'profitability' | 'stability'
+export type TabId = 'overview' | 'growth' | 'profitability' | 'stability' | 'cashflow'
 
 const TABS: readonly { readonly id: TabId; readonly label: string; readonly hint: string }[] = [
   { id: 'overview', label: '概要', hint: 'ひとことで言うと' },
   { id: 'growth', label: '成長性', hint: '売上・利益の伸び' },
   { id: 'profitability', label: '収益性', hint: '儲ける力' },
   { id: 'stability', label: '安定性', hint: '倒れにくさ' },
+  { id: 'cashflow', label: 'キャッシュフロー', hint: 'お金の出入り' },
 ]
 
 interface Props {
@@ -19,8 +21,15 @@ interface Props {
   readonly onTab: (tab: TabId) => void
 }
 
-/** 分析のページの見出し: 一覧へ戻るボタン・企業名・4 つのタブ */
+/** 分析のページの見出し: 一覧へ戻るボタン・企業名・タブ(概要・成長性・収益性・安定性・キャッシュフロー) */
 export function CompanyHeader({ company, tab, onBack, onTab }: Props) {
+  const tabList = useRef<HTMLUListElement>(null)
+  // 狭い画面では、タブの列が横にスクロールする。選んだタブが画面の外にあれば、見える位置まで動かす
+  useEffect(() => {
+    const current = tabList.current?.querySelector('[aria-current="page"]')
+    // jsdom など、scrollIntoView が無い環境では何もしない
+    current?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+  }, [tab])
   const summary = basisSummary(company.periods)
   const changes = hasMixedBasis(company.periods) ? basisChangeLabels(company.periods) : []
   return (
@@ -46,7 +55,7 @@ export function CompanyHeader({ company, tab, onBack, onTab }: Props) {
         ) : null}
 
         <nav aria-label="表示する内容" className="mt-3">
-          <ul className="-mb-px flex list-none gap-1 overflow-x-auto p-0">
+          <ul ref={tabList} className="-mb-px flex list-none gap-1 overflow-x-auto p-0">
             {TABS.map((t) => {
               const current = t.id === tab
               return (

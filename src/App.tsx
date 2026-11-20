@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppFooter } from './components/AppFooter'
+import { CashFlowView } from './components/CashFlowView'
 import { CompanyHeader, type TabId } from './components/CompanyHeader'
 import { GrowthView } from './components/GrowthView'
 import { HomeView } from './components/HomeView'
@@ -187,6 +188,7 @@ export default function App() {
         {company !== null && tab === 'growth' ? <GrowthView company={company} /> : null}
         {company !== null && tab === 'profitability' ? <MetricsView company={company} group="profitability" /> : null}
         {company !== null && tab === 'stability' ? <MetricsView company={company} group="stability" /> : null}
+        {company !== null && tab === 'cashflow' ? <CashFlowView company={company} /> : null}
       </main>
 
       <AppFooter />

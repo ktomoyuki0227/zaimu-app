@@ -76,7 +76,7 @@ function seriesLines(keys: readonly LineSeriesKey[], dotRadius: number) {
 }
 
 /** 数字の範囲(連結・単体)が変わる期の、グラフの下の注意。前後の棒・線を、伸びとして読ませない */
-function BasisNote({ changes }: { readonly changes: readonly string[] }) {
+export function BasisNote({ changes }: { readonly changes: readonly string[] }) {
   if (changes.length === 0) return null
   return (
     <p role="note" className="mt-2 text-sm text-solid-gray-700">
